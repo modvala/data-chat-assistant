@@ -4,7 +4,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
+- **Create an issue**: `gh issue create --title "..." --body "..." --project "Data Chat Assistant"`. Use a heredoc for multi-line bodies. Always pass `--project` so the issue lands on the board.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
@@ -12,6 +12,17 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Close**: `gh issue close <number> --comment "..."`
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
+
+All issues, comments and titles are written in English.
+
+## Project board
+
+Work is tracked on the GitHub Project **"Data Chat Assistant"** (user project `modvala` #5, https://github.com/users/modvala/projects/5), linked to this repo. Its `Status` field has `Todo`, `In Progress`, `Done`.
+
+- **Add an existing issue to the board**: `gh project item-add 5 --owner modvala --url <issue-url>`
+- **List board items**: `gh project item-list 5 --owner modvala --format json`
+- **Move an item between columns**: look up ids with `gh project field-list 5 --owner modvala --format json`, then `gh project item-edit --project-id <project-id> --id <item-id> --field-id <status-field-id> --single-select-option-id <option-id>`
+- When starting work on an issue, set its status to `In Progress`; closing the issue (or merging a PR that closes it) moves it to `Done`.
 
 ## Pull requests as a triage surface
 
