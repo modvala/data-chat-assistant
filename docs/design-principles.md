@@ -46,9 +46,41 @@ Use managed services for infrastructure: compute, storage, secrets and monitorin
 
 The core uses shared interfaces: `LLMClient`, `Warehouse`, `ReportStore`, `KnowledgeStore`, `Tracer`. The prototype uses local adapters. Production uses GCP adapters. Thus the system is easy to extend, and it runs on any machine.
 
+The agent framework is also an adapter. The framework runs the agent loop: LLM calls, tool calls, memory and pauses for confirmation. Our own functions make all safety decisions: SQL validation, the brand scope, masking and the check of the confirmation token. These functions do not import framework types.
+
 ### P7. Gemini is the default LLM
 
 Other LLM providers are only optional adapters.
+
+### P20. The CLI is a thin client
+
+The core gives a turn API: one call takes a user message and returns the answer. The CLI only sends messages and shows answers. Other channels, such as a web chat or a chat bot, can use the same API. The prototype has only the CLI.
+
+### P21. The turn service is stateless in production
+
+In production, the service keeps no state in memory between turns. Each turn loads the session state from a store and then saves it: the conversation, the pending confirmations and the user preferences. Thus any instance can process the next turn, and a restart does not lose a confirmation.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant I1 as Instance 1
+    participant I2 as Instance 2
+    participant S as Session store
+    U->>I1: Request to delete reports
+    I1->>S: Save the pending confirmation
+    I1->>U: Preview and confirmation token
+    U->>I2: Confirmation with the token
+    I2->>S: Load the session and the pending confirmation
+    I2->>U: Result
+```
+
+The prototype is one CLI process, so it keeps the state in memory. The README lists this simplification.
+
+## User experience
+
+### P22. Answers are transparent
+
+The user can see how the agent made each answer: the SQL, the brand scope that the agent applied, the assumptions and the `trace_id`.
 
 ## Security
 
@@ -165,6 +197,15 @@ A trio is Question → SQL query → Analyst report. The ontology tags make the 
 
 The persona, the instructions and the access rights are in external files. The system reads them again at run time. A change does not need a new deployment.
 
+## Quality
+
+### P23. Tests prove the required features
+
+Each of the four required features (P1) has automated tests. Examples:
+
+- Safety: a red-team set of questions that try to get PII, data of other brands or answers that are not analysis.
+- Confirmation: a delete without a valid token does nothing, and a user cannot delete the reports of a different user.
+
 ## Documentation and delivery
 
 ### P18. The rationale has different depths
@@ -180,6 +221,16 @@ The persona, the instructions and the access rights are in external files. The s
 - Generate `requirements.txt` as a fallback for `pip`, because the assignment mentions `pip`.
 - Supply `.env.example`, step-by-step instructions and an example run.
 - Do not hardcode dates. The data is synthetic and it changes.
+
+### P24. The documentation has one source
+
+- `docs/` is the single source of the documentation. A GitHub Action publishes it to GitHub Pages.
+- Each page must also read correctly on github.com, because a reviewer may not open the Pages site.
+- Do not copy content between the README, the docs and the site. Use links.
+
+### P25. Each requirement is traceable
+
+A coverage table maps each requirement of the assignment to a design section, the code, a test and a demo scenario. For a requirement that is only in the design, the table says that there is no code.
 
 ## Exceptions
 
