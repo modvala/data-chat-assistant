@@ -16,6 +16,14 @@ These rules come from the [Karpathy guidelines](https://github.com/multica-ai/an
 4. **Work to a goal that you can check.** Change each task into a goal with a check. For example, "fix the bug" becomes "write a test that shows the bug, then make the test pass". For a task with many steps, write a short plan with a check for each step. Continue until all checks pass.
 - **Customer requirements** live in `docs/requirements/`. Treat them as the source of truth for what the customer asked for.
 
+## Design principles
+
+The project design principles are in `docs/design-principles.md`. Read the principles that touch the area you work in.
+
+- Follow the principles by default.
+- If a change conflicts with a principle, stop. Name the principle ID and the conflict, and ask the user. Do not break the principle before the user approves.
+- Do not add, change or retire a principle without the user's approval.
+
 ## Agent skills
 
 ### Issue tracker
