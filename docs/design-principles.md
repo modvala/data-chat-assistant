@@ -25,7 +25,7 @@ The prototype also has a CLI agent. The agent generates SQL for BigQuery at run 
 
 ### P2. Bonus features are cheap and come last
 
-Do a bonus feature only when it is cheap and only after the required features are done. Possible bonus features: persona from YAML, a small Golden Bucket, an Executive profile in YAML, an eval script. The design and the documentation are more important than bonus features.
+Do a bonus feature only when it is cheap and only after the required features are done. Possible bonus features: persona from YAML, a small Golden Bucket, an Executive profile in YAML, an eval script, a hosted mode on GCP (Cloud Run, Firestore and IAP, see P21). The design and the documentation are more important than bonus features.
 
 ### P3. Mock what is missing, and say so
 
@@ -74,7 +74,7 @@ sequenceDiagram
     I2->>U: Result
 ```
 
-The prototype is one CLI process, so it keeps the state in memory. The README lists this simplification.
+The prototype is one CLI process, so it keeps the state in memory. The README lists this simplification. But each turn of the prototype also loads its state and saves it, through the store interfaces (P6). Thus the hosted mode on GCP (a bonus, P2) needs only new adapters, and no change to the core.
 
 ## User experience
 
