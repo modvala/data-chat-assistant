@@ -22,7 +22,7 @@ The Design, Code, Test and Demo columns stay empty ("—") until the work exists
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R1.1 | At query time, the agent retrieves the top-k similar Trios and puts them into the context. The Answer shows the IDs of the Trios that it used (P22). The prototype retrieves by embeddings only (ADR 0007). Production also filters by ontology tags. | Bonus | — | — | — | — |
+| AC-R1.1 | At query time, Trio retrieval finds the top-k Trios that are close to the question, and the agent puts them into the context. The Answer shows the IDs of the Trios that it used (P22). In the prototype, Trio retrieval uses embeddings only (ADR 0007). Production also filters by metric tags. | Bonus | — | — | — | — |
 | AC-R1.2 | The design shows the update loop: candidate → analyst review → tag → index (P13), with versions for Trios and a retirement of old Trios. | Design | — | — | — | — |
 | AC-R1.3 | The prototype has 2–3 Trios, made from the example questions of the assignment, and cites them in Answers. | Bonus | — | — | — | — |
 

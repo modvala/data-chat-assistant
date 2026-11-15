@@ -58,3 +58,15 @@ _Avoid_: Example, sample
 **Golden Bucket**:
 The collection of approved Trios that the agent uses to interpret new questions as analysts did before.
 _Avoid_: Knowledge base, examples store
+
+**Trio retrieval**:
+Finding the Trios that are close in meaning to a new question.
+_Avoid_: Semantic search, RAG
+
+**Metric catalog**:
+The reviewed definitions of business metrics, such as churn and spend, with their synonyms. The industry name is "semantic layer".
+_Avoid_: Semantic layer, ontology, dictionary
+
+**Metric variant**:
+One named definition of a metric in the Metric catalog, for example churn after 60 days or after 90 days without an order. One variant of each metric is the organization default.
+_Avoid_: Personal definition, custom metric
