@@ -151,7 +151,7 @@ sequenceDiagram
 | Source | Role |
 | --- | --- |
 | Schema description | What the data contains. |
-| Semantic layer (a light ontology in YAML) | Deterministic metric definitions, relations and synonyms. |
+| Metric catalog (in YAML; the industry name is "semantic layer") | Deterministic metric definitions, relations and synonyms. |
 | Golden Bucket | Examples of how analysts interpreted questions, and the report style. |
 
 ### P13. Review adds entries to the Golden Bucket
@@ -160,12 +160,12 @@ sequenceDiagram
 flowchart LR
     D[Successful dialog] --> C[Candidate trio]
     C --> R{Analyst review}
-    R -->|Approved| T[Tag with ontology concepts]
+    R -->|Approved| T[Tag with Metric catalog metrics]
     T --> GB[Golden Bucket]
     R -->|Rejected| X[Discard]
 ```
 
-A trio is Question → SQL query → Analyst report. The ontology tags make the search for similar trios accurate.
+A trio is Question → SQL query → Analyst report. The metric tags make Trio retrieval accurate.
 
 ## Reliability and cost
 

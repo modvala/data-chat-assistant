@@ -20,4 +20,4 @@ These are our assumptions in addition to the [client decisions](docs/requirement
 - The prototype has no real login. The CLI selects the Executive with `--executive <id>`, from `executives.json`.
 - The prototype keeps its state in one process and in local files. Production keeps it in Firestore (P21).
 - The prototype uses the Gemini API free tier. On the free tier, Google can use prompts and responses to improve its products. This is acceptable for the public synthetic dataset. Production uses Gemini on Vertex AI. Reviewers must use their own API key.
-- The prototype has no semantic layer. Trios carry the interpretation of terms such as "churn" ([ADR 0007](docs/adr/0007-no-semantic-layer-in-prototype.md)).
+- The prototype has no Metric catalog (the industry name is "semantic layer"). Trios carry the interpretation of terms such as "churn" ([ADR 0007](docs/adr/0007-no-metric-catalog-in-prototype.md)).
