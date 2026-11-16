@@ -1,5 +1,5 @@
 # Builds the simple docs in docs/site/ and publishes them to GitHub Pages (P24).
-# A pull request only checks the build. A push to main and a manual run also deploy.
+# A pull request checks the build and runs sync-check. A push to main and a manual run also deploy.
 name: Docs site
 
 on:
@@ -11,6 +11,8 @@ on:
       - "uv.lock"
       - ".github/workflows/docs.yml"
       # The sources of the simple docs, for the sync-check job.
+      # Keep this list, the grep in sync-check and the source map in
+      # .claude/skills/sync-simple-docs/PAGES.md the same.
       - "docs/design/**"
       - "docs/adr/**"
       - "docs/requirements/**"
@@ -20,6 +22,7 @@ on:
       - "executives.json"
       - "scripts/**"
       - "src/dca/cli/**"
+      - "src/dca/setup_bq.py"
   push:
     branches: [main]
     paths:
@@ -49,7 +52,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
-          sources=$(printf '%s\n' "$changed" | grep -E '^(docs/design/|docs/adr/|docs/requirements/|docs/requirements-coverage\.md$|docs/tech-stack\.md$|pyproject\.toml$|\.env\.example$|executives\.json$|scripts/|src/dca/cli/)' || true)
+          sources=$(printf '%s\n' "$changed" | grep -E '^(docs/design/|docs/adr/|docs/requirements/|docs/requirements-coverage\.md$|docs/tech-stack\.md$|pyproject\.toml$|\.env\.example$|executives\.json$|scripts/|src/dca/cli/|src/dca/setup_bq\.py$)' || true)
           site=$(printf '%s\n' "$changed" | grep -E '^docs/site/' || true)
           if [ -n "$sources" ] && [ -z "$site" ]; then
             echo "::warning title=Simple docs not synced::This PR changes sources of docs/site/ but not docs/site/. Run the sync-simple-docs skill. Changed sources: $(echo $sources)"

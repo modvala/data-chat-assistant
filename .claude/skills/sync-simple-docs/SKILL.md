@@ -5,7 +5,7 @@ description: Sync the simple docs in docs/site/ (the GitHub Pages site) with the
 
 # Sync the simple docs
 
-`docs/site/` is the GitHub Pages site. Its readers are OpsFleet reviewers (first), engineers who want a quick look (second) and Executives (third). The site is the front door of the project and a high-level demonstration of the product. The detailed docs stay on github.com and are the source of truth (P24 in `docs/design-principles.md`).
+`docs/site/` is the GitHub Pages site. Its readers are OpsFleet reviewers (first), engineers who want a quick look (second) and Executives (third). The site is the first page that reviewers see, and a high-level demonstration of the product. The detailed docs stay on github.com and are the source of truth (P24 in `docs/design-principles.md`).
 
 There are two kinds of page:
 
@@ -21,7 +21,7 @@ There are two kinds of page:
 3. **Write each page.** Follow its outline in PAGES.md and the rules below. Keep the file name and the heading anchors of a page that exists, because people share its URLs. Done when each outline item is on the page.
 4. **Check each page** against every rule below, one rule at a time. Done when each rule passes on each page.
 5. **Build** with `NO_MKDOCS_2_WARNING=1 uv run --only-group docs mkdocs build --strict`. The build also checks the anchors of links between site pages. Done when it passes with no warning.
-6. **Report** to the user: the pages that changed, and each **disagreement** that you found between the detailed docs, the code and the site. Write a disagreement as: what each source says, with its file and line. Fix only the site. The detailed docs and the code stay as they are.
+6. **Report** to the user: the pages that changed, and each **disagreement** that you found between the detailed docs, the code and the site. Write a disagreement as: what each source says, with its file and line. Fix only the site. The detailed docs and the code stay as they are. Done when each changed page and each disagreement is in the report.
 
 ## Rules
 
@@ -35,7 +35,7 @@ There are two kinds of page:
 ### Facts
 
 - A derived page has no numbers, values or rules that a detailed doc owns: no thresholds, limits, budgets, retry counts, model IDs, time windows or brand names. Say what happens, and link to the detail. The one exception is a count that you compute from the rows of the coverage table, such as the status table on Home.
-- Each `##` or `###` section of a derived page that summarizes a detailed doc ends with a **Details** line. When a section has subsections, only the subsections have one. The page intro and navigation sections, such as "Start here", have none, unless PAGES.md asks for one. The Details line has one or more full github.com links to the source sections on `main`:
+- Each `##` or `###` section of a derived page that summarizes a detailed doc ends with a **Details** line. When a section has subsections, only the subsections have one. The page intro and navigation sections, such as "Start here", have none, unless PAGES.md says otherwise. The Details line has one or more full github.com links to the source sections on `main`:
   `**Details:** [HLD §10 Destructive operations](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations)`
   A GitHub anchor is the heading in lower case, with spaces changed to `-` and other punctuation removed: `### 8.1 Layers` → `#81-layers`. A punctuation mark between two spaces (`Safety & PII`) gives `--` on GitHub but `-` on the site.
 - Links between pages in `docs/site/` are relative (`how-it-works.md`). If the target page does not exist yet, link to its current source on github.com: `docs/demo.md` for the Demo tour, `README.md#setup` for Get started and `README.md#use` for the Executive guide.
@@ -68,7 +68,6 @@ Each page must read correctly on the site and on github.com (P24). So use only t
 - A note: a Markdown blockquote (`>`).
 - Two variants, such as the prototype and production: two headed sections, one after the other.
 
-Material tabs (`===`) and admonitions (`!!!`) need indented content, which github.com shows as a code block, so the pages do not use them.
 
 ### Diagrams
 

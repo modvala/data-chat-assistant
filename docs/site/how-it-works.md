@@ -1,6 +1,6 @@
 # How it works
 
-**Status:** the prototype runs all four safety layers on one computer. Finding similar past analyses is a planned extra, and the Google Cloud setup is production design only.
+**Status:** the prototype runs on one computer, with the safety checks in our code. Finding similar past analyses is a planned extra, and the Google Cloud setup is production design only.
 
 The main design idea: the language model is not trusted. It only writes SQL and drafts the text. Our code makes all the security decisions.
 

@@ -1,6 +1,6 @@
 # Key decisions
 
-**Status:** the prototype follows the decisions on safety, deletes, the agent framework and the language models. The cloud, search, test and tone decisions are production design only.
+**Status:** these are the decisions of the full design. The prototype uses local files and free services in place of some choices. The [Requirements](requirements.md) page shows what works in the prototype.
 
 This page gives each key decision of the design: what we chose, what we did not choose, and why. A decision that is hard to change has an architecture decision record (ADR).
 
