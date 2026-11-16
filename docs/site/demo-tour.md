@@ -2,7 +2,7 @@
 
 **Status:** each scenario was tested on the real CLI on `main` ([issue #25](https://github.com/modvala/data-chat-assistant/issues/25)).
 
-This page has one demo scenario for each acceptance criterion with the label **Works in the prototype**. An acceptance criterion is a check that shows that a requirement is done. The [coverage table](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md) links each criterion to its scenario, its code and its tests. The [Requirements](requirements.md) page tells how each feature works.
+This page has one demo scenario for each required acceptance criterion. Each one is **Available now**. An acceptance criterion is a check that shows that a requirement is done. The [coverage table](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md) links each criterion to its scenario, its code and its tests. [Home](index.md) tells how each feature works.
 
 Before you start, do the setup in [Get started](get-started.md).
 

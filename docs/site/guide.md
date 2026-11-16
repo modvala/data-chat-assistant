@@ -38,7 +38,7 @@ When you have more than 3 brands, the header shows only the count, for example `
 
 ### In production
 
-**Production design.** You sign in one time with your company Google account. Then the CLI sends each question through Identity-Aware Proxy (IAP), the Google Cloud sign-in service. Your Brand scope comes from the access table of the company, not from a file on your computer.
+**Coming next.** You sign in one time with your company Google account. Then the CLI sends each question through Identity-Aware Proxy (IAP), the Google Cloud sign-in service. Your Brand scope comes from the access table of the company, not from a file on your computer.
 
 **Details:** [HLD §5.3 Identity on each call](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#53-identity-on-each-call)
 
@@ -112,7 +112,7 @@ The parts of an Answer:
 - **Tables:** the exact figures. A long table shows the first rows and the line `Showing n of n rows. Ask to filter or group them.`
 - **Action items:** a report ends with numbered Action items. Each one starts with a verb and has a `Watch:` line with the metric to watch.
 - **The provenance line:** the line under the Answer shows the facts behind it. It always shows the Brand scope and the trace ID. It shows `/sql` when the Answer ran a query, and `/save` for a report.
-- **Charts:** **Production design**. The prototype shows no charts.
+- **Charts:** **Coming next**. The prototype shows no charts.
 
 Our code makes each table from the rows of the query. The language model does not write the figures of a table. To see the query, type:
 
@@ -293,7 +293,7 @@ uv run chat --executive mgr_ana --plain
 
 ## For the CEO
 
-**Production design.** The Persona is the tone and the content rules for all Answers of the company. The CEO changes it, and the change needs no new release of the software.
+**Coming next.** The Persona is the tone and the content rules for all Answers of the company. The CEO changes it, and the change needs no new release of the software.
 
 1. The CEO edits the Persona in a form in the Admin console.
 2. The system checks the change. A rule that touches the safety rules, such as "show Customer emails", is refused.
@@ -301,6 +301,6 @@ uv run chat --executive mgr_ana --plain
 4. The CEO publishes the new version. Each new question uses it.
 5. If the new tone is wrong, the CEO goes back to an earlier version.
 
-In the prototype, the tone is fixed in the code. A Persona file that the prototype reads for each question is a **Planned extra**.
+In the prototype, the tone is fixed in the code. A Persona file that the prototype reads for each question is **Coming next**.
 
 **Details:** [HLD §14 Persona management](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#14-persona-management)

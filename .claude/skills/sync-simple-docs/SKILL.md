@@ -5,7 +5,7 @@ description: Sync the simple docs in docs/site/ (the GitHub Pages site) with the
 
 # Sync the simple docs
 
-`docs/site/` is the GitHub Pages site. Its readers are OpsFleet reviewers (first), engineers who want a quick look (second) and Executives (third). The site is the first page that reviewers see, and a high-level demonstration of the product. The detailed docs stay on github.com and are the source of truth (P24 in `docs/design-principles.md`).
+`docs/site/` is the GitHub Pages site: the **landing page** of the product. Its readers are OpsFleet reviewers (first), engineers who want a quick look (second) and Executives (third). The tone is "look what we built": features and what the reader gets, not a report on the assignment. The detailed docs stay on github.com and are the source of truth (P24 in `docs/design-principles.md`).
 
 There are two kinds of page:
 
@@ -31,28 +31,29 @@ There are two kinds of page:
 - Use the words of the reader, not of the code. Product, service and file names are permitted (BigQuery, Cloud Run, Gemini, SQLite, `executives.json`). Internal names are not: ports, classes, modules, functions and the names of HLD building blocks (write "Input check" or "a check before the language model", not "Input guard"). General words such as "the agent" and "the sales warehouse" are permitted.
 - When the text of a page uses a glossary term (`CONTEXT.md`), such as Executive, Brand scope, Saved Report or Trio, explain it in plain words at its first use in the text of that page. Diagram labels and examples do not count as a first use. Do not link to `CONTEXT.md`.
 - Put the most useful information first: each page and each section starts with what the reader needs most.
+- Write about the product and what the reader gets. Home and the Under the hood pages name no requirement IDs (R1–R8, AC-…, EX.…) and do not say "you asked" or "we did". Headlines can be short and positive, such as "Your data stays safe".
 
 ### Facts
 
-- A derived page has no numbers, values or rules that a detailed doc owns: no thresholds, limits, budgets, retry counts, model IDs, time windows or brand names. Say what happens, and link to the detail. The one exception is a count that you compute from the rows of the coverage table, such as the status table on Home.
-- Each `##` or `###` section of a derived page that summarizes a detailed doc ends with a **Details** line. When a section has subsections, only the subsections have one. The page intro and navigation sections, such as "Start here", have none, unless PAGES.md says otherwise. A section of a source page that summarizes a detailed doc also ends with a Details line. The Details line has one or more full github.com links to the source sections on `main`:
-  `**Details:** [HLD §10 Destructive operations](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations)`
+- A derived page has no numbers, values or rules that a detailed doc owns: no thresholds, limits, budgets, retry counts, model IDs, time windows or brand names. Say what happens. The one exception is "$0" for the cost of the prototype on Home.
+- Keep links few. Home has no links to the detailed docs, except one footer line. On How it works and Key decisions, each `##` or `###` section has one link at most. PAGES.md says where the links go. A link to a detailed doc is a full github.com URL on `main`, for example `[HLD §10](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations)`.
   A GitHub anchor is the heading in lower case, with spaces changed to `-` and other punctuation removed: `### 8.1 Layers` → `#81-layers`. A punctuation mark between two spaces (`Safety & PII`) gives `--` on GitHub but `-` on the site.
 - Links between pages in `docs/site/` are relative (`how-it-works.md`).
 - In a heading of a site page, write `and`, not `&`, and put no other punctuation mark between two spaces. Then the anchor is the same on the site and on github.com.
 - Each statement agrees with its source. When two sources do not agree, write what the HLD and the ADRs say, and report the disagreement (step 6).
 - On a source page, the code wins over `cli.md`, because the page owns the commands. Values that the CLI prints, or that a command needs, are permitted on a source page.
-- When the design shows a part that has no code on `main`, give it the label of its AC from the coverage table, or **Production design** if it has no AC. When the part has more than one AC, use the label of the AC that is about the prototype (Must or Bonus). A part of the CLI design with no code and no AC, such as charts, gets no label: say that the prototype does not have it. Do not describe it as a part of the prototype.
+- When the design shows a part that has no code on `main`, do not describe it as a part of the prototype. Give it the badge **Coming next**.
 
-### Labels
+### Badges
 
-Each acceptance criterion (AC) has one label. Take it from the "Mark" column of `docs/requirements-coverage.md`. Do not decide it.
+A feature has one of two badges:
 
-| Mark | Label |
+| Badge | When |
 | --- | --- |
-| Must | **Works in the prototype** |
-| Bonus | **Planned extra** |
-| Design, Design (optional) | **Production design** |
+| **Available now** | The feature has code on `main`: the Code column of `docs/requirements-coverage.md` has a link for it, or the code exists (for example Docker). |
+| **Coming next** | The feature is designed, but it has no code on `main`. |
+
+Check the code, not the Mark column: a Bonus item with code is **Available now**. Write the badge as a bold line under the heading: `**Available now**` or `**Coming next**`. The production setup on Google Cloud has its own section and no badge.
 
 ### Examples
 
@@ -80,5 +81,5 @@ Each page must read correctly on the site and on github.com (P24). So use only t
 
 ### Page frame
 
-- The page starts with a `#` heading, then a status line. On a derived page, it says what the page shows: `**Status:** <what works in the prototype and what is only designed, from the coverage table>`. On a source page, it says if the commands are tested on `main`.
+- The page starts with a `#` heading. Home has no status line: its badges show the status. Each other page has a status line after the heading. On How it works and Key decisions, it says what is available now and what is coming next. On a source page, it says if the commands are tested on `main`.
 - The "Last updated" date comes from the git plugin. Do not write a date.

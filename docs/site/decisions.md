@@ -1,8 +1,8 @@
 # Key decisions
 
-**Status:** these are the decisions of the full design. The prototype uses local files and free services in place of some choices. The [Requirements](requirements.md) page shows what works in the prototype.
+**Status:** these are the decisions of the full design. The prototype is **Available now**, with local files and free services in place of the Google Cloud choices. The decisions about past analyses, preferred formats and the tone of the CEO are for features that are **Coming next**.
 
-This page gives each key decision of the design: what we chose, what we did not choose, and why. A decision that is hard to change has an architecture decision record (ADR).
+This page gives each key decision of the design: what we chose, the other options, and why. A decision that is hard to change has an architecture decision record (ADR).
 
 **Details:** [HLD §24 Key decisions](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#24-key-decisions)
 
@@ -18,29 +18,35 @@ Words on this page:
 
 ## Safety and access
 
-- **Brand scope:** We chose to apply the Brand scope in our code and again in BigQuery in production, not in only one place. Two layers cost more work, but one bug cannot leak data. **Details:** [ADR 0001](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0001-brand-scope-by-view-rewrite.md)
-- **Delete safety:** We chose a language model that only plans a delete, not a delete tool with a framework confirmation. Our code checks the reply: it is more code, but no prompt can make the model delete. **Details:** [ADR 0002](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0002-llm-has-no-delete-tool.md)
-- **Delete reply:** We chose a short reply that gets stricter when more Saved Reports match, not a random confirmation code. The reply is easy to type, and an internal link to the exact reports gives the safety. **Details:** [ADR 0002](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0002-llm-has-no-delete-tool.md)
-- **Small groups:** We chose to hide small groups only in results by age, gender or place, not in all data or by our filter only. A list of top Customers still works, and our code decides which queries need it. **Details:** [ADR 0005](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0005-aggregation-threshold-on-demographic-path.md)
+- **Brand scope:** We chose to apply the Brand scope in our code and again in BigQuery in production, not in only one place. Two layers cost more work, but one bug cannot leak data. (ADR 0001)
+- **Delete safety:** We chose a language model that only plans a delete, not a delete tool with a framework confirmation. Our code checks the reply: it is more code, but no prompt can make the model delete. (ADR 0002)
+- **Delete reply:** We chose a short reply that gets stricter when more Saved Reports match, not a random confirmation code. The reply is easy to type, and an internal link to the exact reports gives the safety. (ADR 0002)
+- **Small groups:** We chose to hide small groups only in results by age, gender or place, not in all data or by our filter only. A list of top Customers still works, and our code decides which queries need it. (ADR 0005)
 - **Input check:** We chose rules, a low-cost language model check and managed screening, not managed screening only or a model check only. More than one layer is safer, and the model check also finds the type of the request.
 - **Output check:** We chose rules and a managed check for personal data, not rules only. The managed check finds more types of personal data, for a small cost for each Answer.
 - **Access mapping:** We chose one BigQuery table with the brands of each Executive, not a configuration file or a copy in Firestore. Our code and the BigQuery access rules then use one source.
 
+**Details:** [Architecture decision records](https://github.com/modvala/data-chat-assistant/tree/main/docs/adr)
+
 ## Platform
 
-- **Agent framework:** We chose Google ADK with all safety code outside it, not LangGraph, a plain Gemini library loop first, or PydanticAI inside ADK. ADK fits Google Cloud and has callbacks for our checks, but the team is new to it, so our core stays free of it. **Details:** [ADR 0003](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0003-google-adk-framework.md)
-- **Compute and state:** We chose Cloud Run and Firestore, not the managed agent runtime of Google Cloud with its sessions and memory. It is more code, but the state is structured, editable and in our own store, with less lock-in. **Details:** [ADR 0004](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0004-cloud-run-and-firestore.md)
+- **Agent framework:** We chose Google ADK with all safety code outside it, not LangGraph, a plain Gemini library loop first, or PydanticAI inside ADK. ADK fits Google Cloud and has callbacks for our checks, but the team is new to it, so our core stays free of it. (ADR 0003)
+- **Compute and state:** We chose Cloud Run and Firestore, not the managed agent runtime of Google Cloud with its sessions and memory. It is more code, but the state is structured, editable and in our own store, with less lock-in. (ADR 0004)
 - **Production channel:** We chose the terminal chat through Identity-Aware Proxy, not a web chat. It needs no new front end, and a web chat can use the same agent service later.
 - **Turn transport:** We chose HTTPS with server-sent events, not WebSocket or polling. It is simple, it works through Identity-Aware Proxy, and one direction is sufficient.
 - **Other clouds:** We chose Google Cloud now, with a design that permits a move, not AWS, Azure or our own servers. The data and the preferred language model are on Google Cloud, and a new warehouse needs its own row-level security.
 
+**Details:** [Architecture decision records](https://github.com/modvala/data-chat-assistant/tree/main/docs/adr)
+
 ## AI and knowledge
 
 - **Main language model:** We chose a fast Gemini model, and a smaller one for backup and input checks, not the largest model for all Turns. The cost and the wait are low, and a larger model for long reports is a later option.
-- **Metrics in the prototype:** We chose no Metric catalog in the prototype, where Trios carry the meaning of terms, not a small catalog file. It is less work now, and the catalog is the production target. **Details:** [ADR 0007](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0007-no-metric-catalog-in-prototype.md)
+- **Metrics in the prototype:** We chose no Metric catalog in the prototype, where Trios carry the meaning of terms, not a small catalog file. It is less work now, and the catalog is the production target. (ADR 0007)
 - **Vector search:** We chose an exact vector search in BigQuery while the Golden Bucket is small, not Vertex AI Vector Search or a vector database. It needs fewer services, but it is slower than a dedicated index at a large scale.
-- **Eval data:** We chose a set of test questions that is separate from the Golden Bucket, not Trios that are also test questions. It is more data to keep, but the score is honest. **Details:** [ADR 0006](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0006-eval-set-separate-from-golden-bucket.md)
+- **Eval data:** We chose a set of test questions that is separate from the Golden Bucket, not Trios that are also test questions. It is more data to keep, but the score is honest. (ADR 0006)
 - **Profile update:** We chose a job after each Turn to update the Executive profile, not an update inside the Turn. The Turn stays fast, and the profile is only one Turn late.
+
+**Details:** [Architecture decision records](https://github.com/modvala/data-chat-assistant/tree/main/docs/adr)
 
 ## Operations
 
