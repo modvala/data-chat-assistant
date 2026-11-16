@@ -8,15 +8,16 @@ import contextvars
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import sqlglot
 
 from dca.config import Settings
-from dca.core import context, drafting, input_guard, messages, reports
-from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, SqlView, Text
+from dca.core import confirmation, context, drafting, input_guard, messages, reports
+from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, Result, SqlView, Text
 from dca.core.ports import (
+    AuditEntry,
     ConfigStore,
     Grant,
     KnowledgeStore,
@@ -29,9 +30,13 @@ from dca.core.ports import (
 )
 from dca.core.demographic import THRESHOLD_VIEW
 from dca.core.state import QueryHandle, SessionState, TurnRecord
-from dca.core.turn import DateRange, ThresholdState, TurnContext, TurnStop
+from dca.core.turn import DateRange, ThresholdState, TurnContext, TurnFinish, TurnStop
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
+
+
+class _GateDone(Exception):
+    """The Confirmation gate handled the message. The Turn ends here."""
 
 
 class UnknownExecutive(Exception):
@@ -134,6 +139,11 @@ class TurnAPI:
             trace_id = self.tracer.current_trace_id()
             turn: TurnContext | None = None
             try:
+                progress("thinking", {})
+                gate_answer, gate_outcome, gate_notices = self._confirmation_gate(state, text, trace_id)
+                if gate_answer is not None:
+                    answer, outcome = gate_answer, gate_outcome
+                    raise _GateDone
                 grant = self.access.grant(state.executive_id)
                 span.set("role", grant.role)
                 turn = TurnContext(
@@ -148,7 +158,6 @@ class TurnAPI:
                     reports=self.reports,
                     now=self.clock(),
                 )
-                progress("thinking", {})
                 decision = self._input_guard(text)
                 if decision.blocked:
                     answer = self._refusal(turn, TurnStop("not_analysis", decision.reason))
@@ -159,6 +168,9 @@ class TurnAPI:
                     turn.intent = decision.intent
                     turn.dates = self._date_range()
                     answer, outcome = self._agent_turn(turn, text)
+                answer.blocks = gate_notices + answer.blocks
+            except _GateDone:
+                pass
             except Exception as error:  # noqa: BLE001 - the Turn error handler (P15)
                 self.tracer.log("turn.error", error=type(error).__name__)
                 answer = Answer(
@@ -166,6 +178,8 @@ class TurnAPI:
                 )
                 outcome = "failed"
             span.set("turn.outcome", outcome)
+        answer.provenance.trace_id = answer.provenance.trace_id or trace_id
+        answer.awaiting_confirmation = state.pending is not None
         self._record(state, text, answer, outcome, turn)
         return answer
 
@@ -187,9 +201,47 @@ class TurnAPI:
                 return Answer(kind="notice", blocks=blocks, provenance=Provenance(trace_id=trace_id))
             answer = handler(state, args)
             answer.provenance.trace_id = trace_id
+            answer.awaiting_confirmation = state.pending is not None  # A command does not cancel (HLD 6.2).
             return answer
 
     # --- Turn parts
+
+    def _confirmation_gate(self, state: SessionState, text: str, trace_id: str) -> tuple[Answer | None, str, list]:
+        """Reads the message before the Input guard and the LLM (ADR 0002, HLD 10).
+
+        Returns an Answer when the gate handles the message, else the notices to show before the
+        normal Turn. Only the exact reply of the owner, in the same session, with the same ID set
+        and before the expiry, deletes.
+        """
+        pending = state.pending
+        if pending is None:
+            return None, "", []
+        now = self.clock()
+        with self.tracer.span("confirmation") as span:
+            span.set("count", len(pending.report_ids))
+            if now >= pending.expires_at:
+                state.pending = None
+                span.set("state", "expired")
+                return None, "", [Notice(level="info", title="The delete request expired. Nothing was deleted.")]
+            exact = confirmation.is_exact_reply(text, pending)
+            bound = pending.executive_id == state.executive_id and pending.session_id == state.session_id
+            if not (exact and bound):
+                state.pending = None
+                span.set("state", "cancelled")
+                return None, "", [Notice(level="info", title="Nothing was deleted.")]
+            ids = sorted(report.report_id for report in confirmation.matching(self.reports, state.executive_id, pending))
+            if confirmation.ids_hash(ids) != pending.ids_hash:
+                answer, state.pending = confirmation.preview(self.reports, pending, now=now, settings=self.settings)
+                span.set("state", "changed")
+                return answer, "pending" if state.pending else "answered", []
+            undo_until = now + timedelta(hours=self.settings.confirmation.undo_window_h)
+            batch = self.reports.soft_delete(ids, actor=state.executive_id, undo_until=undo_until, at=now)
+            self.reports.audit(AuditEntry(state.executive_id, "delete", batch.batch_id, batch.report_ids, trace_id, now))
+            state.pending = None
+            span.set("state", "done")
+            span.set("batch_id", batch.batch_id)
+        result = Result(action="deleted", count=len(ids), undo_until=undo_until)
+        return Answer(kind="answer", blocks=[result]), "done", []
 
     def _input_guard(self, text: str) -> input_guard.InputDecision:
         with self.tracer.span("guard.input") as span:
@@ -264,6 +316,8 @@ class TurnAPI:
             )
         except TurnStop as stop:
             return self._refusal(turn, stop), "refused"
+        except TurnFinish as finish:
+            return finish.answer, finish.outcome
         answer = drafting.answer_from_draft(final, turn, model=model)
         return answer, "refused" if any(isinstance(block, Refusal) for block in answer.blocks) else "answered"
 
@@ -330,6 +384,10 @@ class TurnAPI:
         return reports.saved_notice(report)
 
     def _cmd_list(self, state: SessionState, _args: str) -> Answer:
+        pending = state.pending
+        if pending is not None and self.clock() < pending.expires_at:
+            matched = [r for r in self.reports.find(state.executive_id) if r.report_id in set(pending.report_ids)]
+            return reports.list_answer(matched, title="These Saved Reports match the pending delete")
         return reports.list_answer(self.reports.find(state.executive_id))
 
     def _cmd_scope(self, state: SessionState, _args: str) -> Answer:

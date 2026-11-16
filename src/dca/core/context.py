@@ -28,7 +28,9 @@ Tools:
   If the result says "not permitted", stop and do not try a different query.
 - describe_schema(): returns the description of the scoped views.
 - save_report(title): saves the last Answer as a Saved Report, when the Executive asks to save it.
-- list_reports(): lists the Saved Reports of the Executive."""
+- list_reports(): lists the Saved Reports of the Executive.
+- plan_delete(customer_ids, this_conversation, customer_name): plans a delete of Saved Reports. You cannot
+  delete. The system shows the plan and asks the Executive to confirm."""
 
 ANSWER_FORMAT = """\
 When you have the data, give the final answer as one JSON object and nothing else:

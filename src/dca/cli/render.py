@@ -4,6 +4,7 @@ Each component uses only named tokens (DS5). Meaning never depends on color alon
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from rich import box
@@ -21,11 +22,13 @@ from dca.core.answer import (
     ActionItems,
     Answer,
     Bullets,
+    Confirmation,
     Heading,
     Kpi,
     Notice,
     Provenance,
     Refusal,
+    Result,
     SqlView,
     Table,
     Text,
@@ -64,6 +67,7 @@ SYMBOLS = {
     "bar": ("▌", "|"),
     "prompt": ("›", ">"),
     "dash": ("—", "-"),
+    "more": ("…", "..."),
 }
 
 NOTICE_STYLE = {"info": ("dca.accent", "agent"), "warning": ("dca.warning", "warn"), "error": ("dca.danger", "error")}
@@ -188,8 +192,22 @@ class Renderer:
                 self.sql_view(block)
         if any(isinstance(block, SqlView) for block in answer.blocks):
             return
-        notices = [block for block in answer.blocks if isinstance(block, Notice | Refusal)]
-        content = [block for block in answer.blocks if not isinstance(block, Notice | Refusal)]
+        for block in answer.blocks:
+            if isinstance(block, Confirmation):
+                self.confirmation(block)
+            elif isinstance(block, Result):
+                self.result(block)
+        # A notice before the content (for example "Nothing was deleted.") prints first.
+        leading = []
+        for block in answer.blocks:
+            if not isinstance(block, Notice):
+                break
+            leading.append(block)
+        for block in leading:
+            self.notice(block)
+        rest = answer.blocks[len(leading) :]
+        notices = [block for block in rest if isinstance(block, Notice | Refusal)]
+        content = [block for block in rest if not isinstance(block, Notice | Refusal | Confirmation | Result)]
         if content:
             self._content(content, answer.provenance)
         for block in notices:
@@ -328,6 +346,54 @@ class Renderer:
         syntax = Syntax(block.sql, "sql", theme="ansi_dark", line_numbers=True, word_wrap=True)
         self.out(Panel(syntax, box=self._box, padding=(0, 1), width=min(self.console.width, WIDTH_MAX)))
         self.out(RichText(f"  {caption}", style="dca.caption"))
+
+    # C12
+    def confirmation(self, block: Confirmation) -> None:
+        noun = "Saved Report" if block.count == 1 else "Saved Reports"
+        title = f"{self.sym('danger')} Delete {block.count} {noun}?"
+        lines = [block.description, ""]
+        bullet = self.sym("bullet")
+        width = max((len(item.title) for item in block.items), default=0)
+        lines += [f" {bullet} {item.title:<{width}}    {item.date}" for item in block.items]
+        if block.count > len(block.items):
+            lines.append(f" {bullet} {self.sym('more')} and {block.count - len(block.items)} more (/list to see all)")
+        minutes = max(1, round((block.expires_at - datetime.now(block.expires_at.tzinfo)).total_seconds() / 60))
+        footer = [
+            "",
+            f"To delete, type:  {block.reply_text}",
+            f"Any other message cancels. This request expires in {minutes} minutes.",
+            f"You can undo for {block.undo_window_h} hours.",
+        ]
+        if self.mode.plain:
+            for line in [title, *lines, *footer]:
+                self.out(line)
+            return
+        body = RichText("\n".join(lines))
+        body.append("\n\nTo delete, type:  ")
+        body.append(block.reply_text, style="dca.strong")
+        body.append("\n" + "\n".join(footer[2:]))
+        self.out(
+            Panel(
+                body,
+                title=RichText(title, style="dca.danger"),
+                title_align="left",
+                box=box.ASCII if self.mode.ascii else box.HEAVY,
+                border_style="dca.danger",
+                padding=(0, 1),
+                width=min(self.console.width, WIDTH_MAX),
+            )
+        )
+
+    # C13
+    def result(self, block: Result) -> None:
+        noun = "Saved Report" if block.count == 1 else "Saved Reports"
+        text = f"Deleted {block.count} {noun}." if block.action == "deleted" else f"Restored {block.count} {noun}."
+        if block.undo_until is not None:
+            local = block.undo_until.astimezone().strftime("%Y-%m-%d %H:%M")
+            text += f" Type /undo before {local} to restore them."
+        line = RichText(f"{self.sym('ok')} ", style="dca.success")
+        line.append(text, style="dca.text")
+        self.out(line)
 
     # C11
     def notice(self, notice: Notice) -> None:
