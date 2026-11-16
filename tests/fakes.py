@@ -74,9 +74,16 @@ class ScriptedLLM:
         self.always_fail: int | None = None
         self.fail_models: set[str] = set()  # these models always fail with a 503
         self.classifier_failures = 0  # the first n classifier calls fail with a 429
+        self.repairs: list[str] = []  # the replies to the JSON repair calls; none left gives a 503
+        self.repair_calls: list[tuple[str, str]] = []
 
     # LLMClient port
     def generate(self, prompt: str, *, model: str, system: str = "", json_schema: dict | None = None) -> LLMResult:
+        if json_schema is not None and "intent" not in json_schema.get("properties", {}):
+            self.repair_calls.append((model, prompt))
+            if not self.repairs:
+                raise LLMTransientError(503)
+            return LLMResult(text=self.repairs.pop(0), tokens_in=50, tokens_out=50)
         self.classifier_calls.append((model, prompt))
         if self.always_fail is not None:
             raise LLMTransientError(self.always_fail)
@@ -193,6 +200,9 @@ class FakeWarehouse:
     def run(
         self, sql: str, params: dict[str, Sequence[str]], *, max_bytes: int, timeout_s: float, job_id: str
     ) -> QueryResult:
+        if any(run.job_id == job_id for run in self.runs):
+            # BigQuery returns 409 Conflict for a job ID that it has seen. The adapter does not map it.
+            raise RuntimeError(f"Conflict: job {job_id} already exists")
         self.runs.append(Call(sql, {k: tuple(v) for k, v in params.items()}, job_id, max_bytes))
         if job_id.startswith("dca-brands-"):
             return QueryResult(job_id, ["brand"], [[b] for b in self.brands], 1000)

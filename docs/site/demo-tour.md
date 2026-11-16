@@ -352,7 +352,7 @@ What you see:
 
 The language model sometimes fixes a typo before it writes the SQL. Then you get a normal Answer, and the provenance line shows the value that it used. On a demographic query, for example "the average spend by age in Boston", our code never guesses a typo. When the value exists or a small group can hide it, you get the refusal `This group is too small to show`.
 
-When the language model writes SQL that fails, the status line shows `Fixing the query · attempt 2 of 3`. Then the provenance line shows `1 correction`. `/sql all` shows each attempt and its error. After 2 failed corrections, you get an error notice with the trace ID.
+When the language model writes SQL that fails, the status line shows `Fixing the query · attempt 2 of 3`. Then the provenance line shows `1 correction`. `/sql all` shows each attempt and its error. After 2 failed corrections, you get an error notice with the trace ID. But when an earlier query of the same question returned rows, you get an Answer from those rows. The Answer tells which part of the question the rows do not answer.
 
 ## D9. Service failures (AC-R5.2)
 

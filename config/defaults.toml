@@ -51,6 +51,7 @@ trace_rows = 20
 conversation_tokens = 6000
 schema_tokens = 2000
 input_max_chars = 2000
+classifier_questions = 3  # earlier questions that the intent classifier gets, for a follow-up
 
 # Prices for the "cost for each Turn" metric (HLD 16.2). Starting values, not quotes:
 # the prototype uses the free tiers, so its real cost is $0. Change them to your contract prices.

@@ -550,7 +550,7 @@ flowchart LR
 | --- | --- | --- |
 | Size and format | Rules: maximum length, no binary content | Refusal `not_analysis` |
 | Known injection patterns | Rules: "ignore previous instructions", requests for the system prompt | Refusal `not_analysis` |
-| Intent | `gemini-3.5-flash-lite` with structured output: `analysis`, `schema_question`, `report`, `delete`, `profile`, `other` | `other` gets a refusal `not_analysis` |
+| Intent | `gemini-3.5-flash-lite` with structured output: `analysis`, `schema_question`, `report`, `delete`, `profile`, `other`. The classifier also gets the last answered questions of the session (`limits.classifier_questions`, default 3), so that a follow-up such as "explain that in more detail" is `analysis`. A refused message does not come back. | `other` gets a refusal `not_analysis` |
 | Prompt injection and jailbreak | Model Armor (production) | Refusal `not_analysis` |
 
 The Input guard is only the first filter. The safety of the data does not depend on it, because the SQL guard and the warehouse apply the rules again.
@@ -671,6 +671,8 @@ flowchart TB
 ```
 
 The router separates two cases (P9). "Show all customers aged 25 from Boston" gets a refusal. "Average spend by age group in Boston" is permitted. When the threshold hides all groups of a demographic query, the code gives a refusal with the reason `threshold`.
+
+The router supports one shape: one aggregate SELECT over `scoped_customers`, optionally joined to `scoped_order_items`, with only the columns of the threshold view. The LLM instruction states this shape, and the code makes the text from the same column list as the router (`demographic.rules_text`). Thus the LLM does not learn the shape only from blocked queries.
 
 ### 8.8 Output guard and block validator
 
@@ -1152,7 +1154,7 @@ flowchart TB
 - The dry run is free, so it catches syntax errors with no cost (P14).
 - The CLI shows `Fixing the query · attempt n of 3` during a correction. The Provenance shows the number of corrections ([cli.md P-CORRECT](cli.md#p-correct-self-correction-and-empty-result)).
 - For an empty result, the agent finds the cause. It does not only try again. The code makes an info notice with the cause and a next step, for example `No orders from "Califronia". Did you mean California?`.
-- After the last failed attempt, the Executive gets an error notice with the `trace_id`.
+- After the last failed attempt, the Executive gets an error notice with the `trace_id`. If an earlier query of the Turn returned rows, the agent writes the Answer from those rows instead ([section 15.4](#154-turn-budget)).
 
 ### 15.2 External calls
 
@@ -1177,6 +1179,8 @@ flowchart LR
 | Fallback model | `gemini-3.5-flash-lite` | The Provenance has `fallback_used`. The CLI shows "backup model" ([cli.md P-FAIL](cli.md#p-fail-service-failure-and-fallback)). |
 | Circuit breaker (production) | Opens after 5 failures in 60 s, tries again after 30 s (V10) | When it is open, the call goes to the fallback at once. |
 
+The fallback model runs the Turn again from the start. Its BigQuery jobs get new job IDs, because BigQuery rejects a job ID that it has seen (409).
+
 ### 15.3 Failures and what the Executive sees
 
 | Failure | Detection | Action | Executive sees |
@@ -1188,6 +1192,7 @@ flowchart LR
 | Embedding or vector search down | Exception | Continue with no Trios | A normal Answer with no Trio IDs. The trace records the degradation. |
 | State store write fails (production) | Exception | Retry. The Turn fails before the Answer if it cannot save the session. | Error notice |
 | Trace exporter fails | Exception | Spans go to a local buffer. A trace failure never fails a Turn. | Nothing |
+| The final Answer is JSON that does not parse | `json.loads` fails on text that starts with `{` | One repair call on the fallback model, with structured output. It counts in the Turn budget. | A normal Answer. If the repair fails: a short text that asks for a different wording. Never raw JSON. |
 | Bug in our code | Any exception | The Turn error handler catches it | Error notice with the `trace_id`. The CLI does not stop. |
 
 The error notice has no stack trace, no HTTP code and no vendor name ([cli.md P-FAIL](cli.md#p-fail-service-failure-and-fallback)).
@@ -1203,6 +1208,7 @@ The error notice has no stack trace, no HTTP code and no vendor name ([cli.md P-
 | SQL corrections | 2 (AC-R5.1) |
 
 - When a Turn goes over a budget, the agent stops. A refusal with the reason `budget` tells the Executive which limit stopped it, in plain words ([cli.md P-BUDGET](cli.md#p-budget-budget-limit)). It does not show the internal limit values.
+- A Turn that already has query results does not end with no data. When it has used its SQL corrections, or when only one LLM call is left, the `run_query` result tells the LLM to stop the queries and write the Answer from the results that it has. The Answer tells which part of the question the results do not answer. A "why" question needs many queries, so this case is frequent.
 - The classifier uses the cheap model, and a dry run is free. Thus a refusal or a bad query costs little.
 - A result cache is a bonus (EX.1). Its key is the hash of the normalized SQL and the Effective scope. The key must hold the Effective scope, or a Manager could get a cached result of the CEO.
 

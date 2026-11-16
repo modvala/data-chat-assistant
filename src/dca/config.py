@@ -66,6 +66,7 @@ class Limits(BaseModel):
     conversation_tokens: int
     schema_tokens: int
     input_max_chars: int
+    classifier_questions: int
 
 
 class Cost(BaseModel):
