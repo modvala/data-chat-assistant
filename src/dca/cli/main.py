@@ -35,6 +35,18 @@ def detect_mode(*, no_color: bool, plain: bool, ascii_: bool, no_animation: bool
     )
 
 
+def make_console(mode: Mode, **options: Any) -> Console:
+    """With no color, the Console has no color system: it writes no ANSI codes at all (DS4)."""
+    return Console(
+        theme=THEME,
+        no_color=not mode.color,
+        color_system="standard" if mode.color else None,
+        highlight=False,
+        emoji=False,
+        **options,
+    )
+
+
 def make_app(api_factory: ApiFactory = _default_api, settings_factory: Callable[[], Settings] = Settings) -> typer.Typer:
     app = typer.Typer(add_completion=False)
 
@@ -48,13 +60,7 @@ def make_app(api_factory: ApiFactory = _default_api, settings_factory: Callable[
     ) -> None:
         """Ask questions about the sales data."""
         mode = detect_mode(no_color=no_color, plain=plain, ascii_=ascii_, no_animation=no_animation, stream=sys.stdout)
-        console = Console(
-            theme=THEME,
-            no_color=not mode.color,
-            color_system="standard" if mode.color else None,
-            highlight=False,
-            emoji=False,
-        )
+        console = make_console(mode)
         settings = settings_factory()
         renderer = Renderer(console, mode, settings.display.header_max_brands)
         api = api_factory(settings)
@@ -91,7 +97,11 @@ def repl(api: TurnAPI, session_id: str, renderer: Renderer, console: Console) ->
         else:
             number += 1
             renderer.separator(number)
-            answer = run_turn(api, session_id, text)
+            status = renderer.start_status()
+            try:
+                answer = run_turn(api, session_id, text, status.update)
+            finally:
+                status.stop()
         renderer.answer(answer)
         pending = answer.awaiting_confirmation
 
@@ -102,14 +112,16 @@ def _wait(done: threading.Event) -> None:
     done.wait(0.1)
 
 
-def run_turn(api: TurnAPI, session_id: str, text: str) -> Answer:
+def run_turn(
+    api: TurnAPI, session_id: str, text: str, on_progress: Callable[[str, dict[str, Any]], None] | None = None
+) -> Answer:
     """Runs one Turn in a worker thread. Ctrl+C during the Turn cancels only the Turn (cli.md C2)."""
     result: dict[str, Answer] = {}
     done = threading.Event()
 
     def work() -> None:
         try:
-            result["answer"] = api.send_message(session_id, text)
+            result["answer"] = api.send_message(session_id, text, on_progress)
         finally:
             done.set()
 
