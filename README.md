@@ -117,10 +117,10 @@ The `live` tests use Gemini and your BigQuery project (the setup above). They ch
 uv run pytest --live tests/test_live.py
 ```
 
-Each Turn writes its trace and its log lines to `dca_traces.jsonl`. This command computes the metrics of [HLD 16.2](docs/design/hld.md#162-metrics) from the file:
+Each Turn writes its trace and its log lines to `data/dca_traces.jsonl`. This command computes the metrics of [HLD 16.2](docs/design/hld.md#162-metrics) from the file:
 
 ```bash
-uv run dca-metrics dca_traces.jsonl
+uv run dca-metrics data/dca_traces.jsonl
 ```
 
 ## Documentation
@@ -140,7 +140,7 @@ These are our assumptions in addition to the [client decisions](docs/requirement
 
 - "Client X" in "Delete all reports mentioning Client X" means a Customer. Each Saved Report records the IDs of the Customers in the result rows of its queries, and the delete matches on these IDs. For a name, the agent asks for the Customer ID.
 - The prototype has no real login. The CLI selects the Executive with `--executive <id>`, from `executives.json`.
-- The prototype keeps its state in one process and in local files: sessions in memory, Saved Reports and the audit log in SQLite (`dca_reports.sqlite`), traces in `dca_traces.jsonl`. Production keeps them in Firestore and Cloud Trace (P21). Each Turn still loads and saves its state through the ports.
+- The prototype keeps its state in one process and in local files: sessions in memory, Saved Reports and the audit log in SQLite (`data/dca_reports.sqlite`), traces in `data/dca_traces.jsonl`. Production keeps them in Firestore and Cloud Trace (P21). Each Turn still loads and saves its state through the ports.
 - The prototype uses the Gemini API free tier. On the free tier, Google can use prompts and responses to improve its products. This is acceptable for the public synthetic dataset. Production uses Gemini on Vertex AI. Reviewers must use their own API key. On the free tier, `gemini-3.8-flash` often answers "high demand"; the agent then retries and uses the backup model.
 - The prototype has no Metric catalog (the industry name is "semantic layer"). The LLM interprets terms such as "churn" from the schema description ([ADR 0007](docs/adr/0007-no-metric-catalog-in-prototype.md)). The Golden Bucket and Trio retrieval are bonus features and are not in the prototype.
 - A row list of Customers that shows age, gender, state or city gets a refusal `pii`, also with no filter on these columns. A demographic aggregate is permitted.

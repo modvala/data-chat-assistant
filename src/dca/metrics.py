@@ -2,7 +2,7 @@
 
 Each metric comes from a span attribute or a log field. No metric needs extra code in the Turn.
 
-    uv run dca-metrics [dca_traces.jsonl]
+    uv run dca-metrics [data/dca_traces.jsonl]
 """
 
 import json

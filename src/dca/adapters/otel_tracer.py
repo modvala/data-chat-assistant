@@ -146,6 +146,10 @@ class _Span:
 
 class JsonlTracer:
     def __init__(self, path: Path) -> None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            log.warning("Could not make the folder of the trace file", exc_info=True)  # A trace never stops the CLI.
         _install_provider()
         _FILE.path = path
         self.path = path

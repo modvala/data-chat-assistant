@@ -151,10 +151,10 @@ you › /undo
 you › /list
 ```
 
-What you see: `✓ Restored 2 Saved Reports.`, and `/list` shows them again. Each delete and each undo writes an audit entry with the `trace_id` in `dca_reports.sqlite`:
+What you see: `✓ Restored 2 Saved Reports.`, and `/list` shows them again. Each delete and each undo writes an audit entry with the `trace_id` in `data/dca_reports.sqlite`:
 
 ```bash
-sqlite3 dca_reports.sqlite "SELECT action, batch_id, report_ids, trace_id FROM audit_log"
+sqlite3 data/dca_reports.sqlite "SELECT action, batch_id, report_ids, trace_id FROM audit_log"
 ```
 
 ## D8. Self-correction and empty results (AC-R5.1)
@@ -206,10 +206,10 @@ you › What is the revenue by brand?
 you › /trace
 ```
 
-Each Answer, notice and refusal shows `trace <id>`. The trace file `dca_traces.jsonl` has one trace for each Turn, with the ADK spans and our spans in one tree, and JSON log lines with the `trace_id`. It has no PII: only the final SQL, the column names, the row count and the first 20 rows after the Output guard.
+Each Answer, notice and refusal shows `trace <id>`. The trace file `data/dca_traces.jsonl` has one trace for each Turn, with the ADK spans and our spans in one tree, and JSON log lines with the `trace_id`. It has no PII: only the final SQL, the column names, the row count and the first 20 rows after the Output guard.
 
 ```bash
-grep -c '"type": "span"' dca_traces.jsonl
+grep -c '"type": "span"' data/dca_traces.jsonl
 ```
 
 ## D12. Metrics (AC-R7.2)
@@ -217,7 +217,7 @@ grep -c '"type": "span"' dca_traces.jsonl
 After some Turns:
 
 ```bash
-uv run dca-metrics dca_traces.jsonl
+uv run dca-metrics data/dca_traces.jsonl
 ```
 
 What you see: each metric of [HLD 16.2](design/hld.md#162-metrics), computed from the trace file only: the Turn success rate, the block rate for each reason, the self-correction rate and success rate, the empty-result rate, the LLM error and fallback rate, the p50 and p95 latency, the cost for each Turn, the confirmation completion and abort rate, and the budget stop rate.
