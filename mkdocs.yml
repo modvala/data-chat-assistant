@@ -15,15 +15,14 @@ validation:
 # The page specs are in .claude/skills/sync-simple-docs/PAGES.md.
 nav:
   - Home: index.md
-  - Understand:
-      - How it works: how-it-works.md
-      - Requirements: requirements.md
-      - Key decisions: decisions.md
   - Try it:
-      - Get started: get-started.md
       - Demo tour: demo-tour.md
+      - Get started: get-started.md
   - Use it:
       - Executive guide: guide.md
+  - Under the hood:
+      - How it works: how-it-works.md
+      - Key decisions: decisions.md
 
 theme:
   name: material
