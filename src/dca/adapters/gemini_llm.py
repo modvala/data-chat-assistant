@@ -18,13 +18,21 @@ def _retry_after(error: errors.APIError) -> float | None:
 
 class GeminiLLMClient:
     def __init__(self, api_key: str, timeout_s: float) -> None:
-        # One attempt only: our code does the backoff, so that the CLI can show it (P15).
-        self._client = genai.Client(
-            api_key=api_key or None,
-            http_options=types.HttpOptions(
-                timeout=int(timeout_s * 1000), retry_options=types.HttpRetryOptions(attempts=1)
-            ),
-        )
+        self.api_key = api_key
+        self.timeout_s = timeout_s
+        self._client: genai.Client | None = None
+
+    @property
+    def client(self) -> genai.Client:
+        if self._client is None:
+            # One attempt only: our code does the backoff, so that the CLI can show it (P15).
+            self._client = genai.Client(
+                api_key=self.api_key or None,
+                http_options=types.HttpOptions(
+                    timeout=int(self.timeout_s * 1000), retry_options=types.HttpRetryOptions(attempts=1)
+                ),
+            )
+        return self._client
 
     def generate(self, prompt: str, *, model: str, system: str = "", json_schema: dict | None = None) -> LLMResult:
         config = types.GenerateContentConfig(
@@ -33,7 +41,7 @@ class GeminiLLMClient:
             response_json_schema=json_schema,
         )
         try:
-            response = self._client.models.generate_content(model=model, contents=prompt, config=config)
+            response = self.client.models.generate_content(model=model, contents=prompt, config=config)
         except errors.APIError as error:
             if error.code == 429 or (error.code or 0) >= 500:
                 raise LLMTransientError(error.code, _retry_after(error)) from None

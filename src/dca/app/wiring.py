@@ -3,6 +3,7 @@
 from dotenv import load_dotenv
 
 from dca.adapters.bigquery_warehouse import BigQueryWarehouse
+from dca.adapters.gemini_llm import GeminiLLMClient
 from dca.adapters.local_stores import InMemorySessionStore, JsonConfigStore, SchemaKnowledgeStore
 from dca.adapters.otel_tracer import JsonlTracer
 from dca.agent.adk_loop import AdkAgentLoop, gemini_factory
@@ -21,5 +22,6 @@ def build_turn_api(settings: Settings | None = None) -> TurnAPI:
         warehouse=BigQueryWarehouse(settings.google_cloud_project),
         tracer=JsonlTracer(settings.paths.trace_file),
         knowledge=knowledge,
+        llm=GeminiLLMClient(settings.google_api_key, settings.timeout.llm_call_s),
         agent_loop=AdkAgentLoop(gemini_factory, knowledge),
     )
