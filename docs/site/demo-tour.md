@@ -257,8 +257,8 @@ What you see:
     ```text
     ┏━ ⚠ Delete 2 Saved Reports? ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
     ┃ These reports mention Customer 4521:                            ┃
-    ┃  • Top 5 by spend     2026-11-16                                ┃
-    ┃  • Top 5 by orders    2026-11-16                                ┃
+    ┃  • Top 5 by spend     <date>                                    ┃
+    ┃  • Top 5 by orders    <date>                                    ┃
     ┃ To delete, type:  delete 2                                      ┃
     ┃ Any other message cancels. This request expires in 5 minutes.   ┃
     ┃ You can undo for 24 hours.                                      ┃
@@ -275,7 +275,7 @@ If you reply after 5 minutes, you see `The delete request expired. Nothing was d
 
 ## D6. Only the owner can delete (AC-R3.2)
 
-The reports of `mgr_ana` from D5 must exist. If you deleted them in D5, do D7 first.
+D6 needs the Saved Reports of D5, but D5 ends with a delete. So first, in the chat of `mgr_ana`, type `/undo` to restore them (D7 explains it).
 
 1. In a new terminal, start the chat as `mgr_ben`:
 
@@ -369,7 +369,7 @@ What you see:
 1. The session header.
 2. Some of these lines:
     - `Service is busy, trying again in n s` while the agent waits.
-    - `Using the backup model`, and `backup model` in the provenance line, when the main model fails after its retries. On the Gemini free tier this also occurs with no chaos mode, because `gemini-3.8-flash` often answers "high demand".
+    - `Using the backup model`, and `backup model` in the provenance line, when the main model fails after its retries. On the Gemini free tier this also occurs with no chaos mode, because the main model often answers "high demand".
     - When all retries fail: `The data service did not answer. Please try again in a minute. Your session continues.` with the trace ID. The session continues, and there is no stack trace.
 
 ## D10. Turn budgets and Ctrl+C (AC-R5.3)
@@ -463,13 +463,13 @@ What you see:
 1. The steps of the Turn, as a tree:
 
     ```text
-    trace 7f3a9c12 · 2026-11-16 14:02:11 · 4.2 s · answered
-    ├─ input classifier      ✓ analysis                                  12 ms
-    ├─ llm gemini-3.8-flash  ✗ status 503 · 2 retries                   9.1 s
-    ├─ llm gemini-3.5-flash-lite  ✓ 1,204 → 311 tokens · backup model  1.1 s
-    ├─ sql validation        ✓ scoped                                     3 ms
-    ├─ bigquery              ✓ 12.4 MB · 3 rows                         1.6 s
-    └─ output check          ✓                                            5 ms
+    trace <id> · <date> <time> · <n> s · answered
+    ├─ input classifier       ✓ analysis                               <n> ms
+    ├─ llm <main model>       ✗ status 503 · 2 retries                 <n> s
+    ├─ llm <backup model>     ✓ <n> → <n> tokens · backup model        <n> s
+    ├─ sql validation         ✓ scoped                                 <n> ms
+    ├─ bigquery               ✓ <n> MB · <n> rows                      <n> s
+    └─ output check           ✓                                        <n> ms
     ```
 
 `/trace` reads the trace file only. Thus it works for a Turn of an earlier session, and also when the language model is down.

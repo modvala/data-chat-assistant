@@ -8,7 +8,7 @@ There are two ways to run the prototype: with uv on your computer, or with [Dock
 
 ## Prerequisites
 
-- Python 3.12 and [uv](https://docs.astral.sh/uv/). If Python 3.12 is not on your computer, uv installs it.
+- Python 3.12 and [uv](https://docs.astral.sh/uv/). uv is the only dependency manager of the project. If Python 3.12 is not on your computer, uv installs it.
 - The [Google Cloud CLI](https://cloud.google.com/sdk/docs/install): the `gcloud` and `bq` commands.
 - A Google account that can make a Google Cloud project.
 - A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).

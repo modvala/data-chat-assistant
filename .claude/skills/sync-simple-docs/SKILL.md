@@ -18,7 +18,7 @@ There are two kinds of page:
 
 1. **Select the pages.** If the user names pages, use them. If the user names changed files, or a branch, find each page whose sources include a changed file (the source map in PAGES.md). Otherwise, select all pages. Done when you have a list of page files.
 2. **Read the sources.** For each selected page, read its spec in PAGES.md and every source that the spec lists, in full. For a source page, also run the commands that it documents, or read the code that makes them (`--help` output, `pyproject.toml`, `.env.example`, `scripts/`). Done when you can name the source of each statement that you will write.
-3. **Write each page.** Follow its outline in PAGES.md and the rules below. Keep the file name and the heading anchors of a page that exists, because people share its URLs. When you move a file into `docs/site/` with `git mv`, commit the move before you change the content, so that `git log --follow` keeps the history. Done when each outline item is on the page.
+3. **Write each page.** Follow its outline in PAGES.md and the rules below. Keep the file name and the heading anchors of a page that exists, because people share its URLs. Done when each outline item is on the page.
 4. **Check each page** against every rule below, one rule at a time. Done when each rule passes on each page.
 5. **Build** with `NO_MKDOCS_2_WARNING=1 uv run --only-group docs mkdocs build --strict`. The build also checks the anchors of links between site pages. Done when it passes with no warning.
 6. **Report** to the user: the pages that changed, and each **disagreement** that you found between the detailed docs, the code and the site. Write a disagreement as: what each source says, with its file and line. Fix only the site. The detailed docs and the code stay as they are. Done when each changed page and each disagreement is in the report.
@@ -38,10 +38,10 @@ There are two kinds of page:
 - Each `##` or `###` section of a derived page that summarizes a detailed doc ends with a **Details** line. When a section has subsections, only the subsections have one. The page intro and navigation sections, such as "Start here", have none, unless PAGES.md says otherwise. A section of a source page that summarizes a detailed doc also ends with a Details line. The Details line has one or more full github.com links to the source sections on `main`:
   `**Details:** [HLD §10 Destructive operations](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations)`
   A GitHub anchor is the heading in lower case, with spaces changed to `-` and other punctuation removed: `### 8.1 Layers` → `#81-layers`. A punctuation mark between two spaces (`Safety & PII`) gives `--` on GitHub but `-` on the site.
-- Links between pages in `docs/site/` are relative (`how-it-works.md`). If the target page does not exist yet, link to its current source on github.com.
+- Links between pages in `docs/site/` are relative (`how-it-works.md`).
 - In a heading of a site page, write `and`, not `&`, and put no other punctuation mark between two spaces. Then the anchor is the same on the site and on github.com.
 - Each statement agrees with its source. When two sources do not agree, write what the HLD and the ADRs say, and report the disagreement (step 6).
-- On a source page, the code wins over `cli.md` and the README, because the page owns the commands. Values that the CLI prints, or that a command needs, are permitted on a source page.
+- On a source page, the code wins over `cli.md`, because the page owns the commands. Values that the CLI prints, or that a command needs, are permitted on a source page.
 - When the design shows a part that has no code on `main`, give it the label of its AC from the coverage table, or **Production design** if it has no AC. When the part has more than one AC, use the label of the AC that is about the prototype (Must or Bonus). A part of the CLI design with no code and no AC, such as charts, gets no label: say that the prototype does not have it. Do not describe it as a part of the prototype.
 
 ### Labels
@@ -58,7 +58,7 @@ Each acceptance criterion (AC) has one label. Take it from the "Mark" column of 
 
 - An example input is one shell command, one question or one CLI command in its own `bash` or `text` code block. Material adds a copy button to each block.
 - An example output is in a `text` block. It shows the **shape** of the Answer, with no figures from the data. The data is synthetic and it changes (P19).
-- Number the inputs of one scenario or section (1, 2, 3), and use the same numbers in "What you see". A key press, such as `Ctrl+C`, or another reply to the same prompt can be in the text.
+- Number the inputs of one Demo tour scenario (1, 2, 3), and use the same numbers in "What you see". A key press, such as `Ctrl+C`, or another reply to the same prompt can be in the text.
 - Each example must run on the CLI on `main`. An input counts as tested when it ran on the CLI, or when it is the same input as a tested Demo tour scenario. If you cannot run it, say so on the status line and in the report.
 
 ### Layout

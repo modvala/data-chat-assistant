@@ -1,6 +1,6 @@
 # Executive guide
 
-**Status:** the commands and the options agree with `/help` and `--help` of the CLI on `main`. Most example questions come from the [Demo tour](demo-tour.md), which was tested on the real CLI.
+**Status:** the commands and the options agree with `/help` and `--help` of the CLI on `main`. Most example questions come from the [Demo tour](demo-tour.md), which was tested on the real CLI. These examples were not run: the Texas and California question, the churn question, the Q1 report and `/scope`.
 
 This guide is for Executives: the brand managers and the CEO who chat with the agent. You ask a question about the sales data in plain words. The agent gives an Answer: a reply with analysis, in the chat. You do not install anything. In the prototype, an engineer does the setup in [Get started](get-started.md).
 

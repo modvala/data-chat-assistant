@@ -117,7 +117,7 @@ Outline, in this order: prerequisites; install with `uv sync` (uv is the only de
 
 ## Demo tour (`demo-tour.md`)
 
-**Reader:** reviewers. **Sources:** the Must ACs of `docs/requirements-coverage.md`, the CLI.
+**Reader:** reviewers. **Sources:** the Must ACs of `docs/requirements-coverage.md`, the CLI, `src/dca/core/messages.py`, `src/dca/app/turn_api.py`.
 
 **Out:** the setup steps (link to Get started) and the design of each feature (link to Requirements).
 
