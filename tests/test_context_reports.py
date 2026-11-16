@@ -12,7 +12,8 @@ from dca.app.turn_api import TurnAPI
 from dca.cli.main import make_app
 from dca.config import Settings
 from dca.cli.render import THEME, Mode, Renderer
-from dca.core.answer import ActionItems, Answer, Kpi, SqlView, Table
+from dca.core.answer import ActionItems, Answer, Kpi, Notice, SqlView, Table
+from dca.core.answer import Text as Text_
 from tests.conftest import read_jsonl
 from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call, text
 
@@ -69,6 +70,22 @@ def test_ac_r2_3_instruction_gives_the_demographic_query_rules_from_the_guard(ma
     context = instruction_of(llm)
     assert "COUNT(DISTINCT scoped_customers.id)" in context
     assert "scoped_order_items: user_id, order_id, sale_price, status, created_at, brand, category" in context
+
+
+def test_ac_core_1_instruction_keeps_the_json_format_for_follow_ups(make_api: Callable[..., TurnAPI]) -> None:
+    # Live run, trace 6a39adc9: the model copied the summary of an earlier Answer
+    # ("Table: columns ...", rows as lists) as its answer, with no JSON and no query.
+    llm = ScriptedLLM(answer({"type": "text", "markdown": "x"}), answer({"type": "text", "markdown": "y"}))
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+    api.send_message(session.session_id, "Who are my top 5 Customers by total spend?")
+
+    api.send_message(session.session_id, "Show them again")
+
+    context = instruction_of(llm)
+    assert "short summaries of earlier Answers, not the answer format" in context
+    assert "Always give the final answer as this JSON object, also for a follow-up" in context
+    assert "run its query again and use a table block" in context
 
 
 def test_ac_core_1_conversation_stays_within_the_v18_limit(
@@ -220,18 +237,52 @@ def test_ac_core_1_answer_json_that_does_not_parse_gets_one_repair_call(
     assert spans(settings, "answer.repair")[0]["attributes"]["repaired"] is True
 
 
-def test_ac_core_1_answer_json_that_cannot_be_repaired_is_never_shown_raw(
-    make_api: Callable[..., TurnAPI], capsys: pytest.CaptureFixture[str]
+def test_ac_core_1_repair_call_gets_a_retry_after_a_429(make_api: Callable[..., TurnAPI], settings: Settings) -> None:
+    # Live run, trace 686d2f07: the repair call got a 429 and had no retry.
+    llm = ScriptedLLM(call("run_query", sql=MONTHLY_SQL), text(BROKEN_REPORT), intent="report")
+    llm.repairs = [FIXED_REPORT]
+    llm.repair_failures = 1
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Create a report for Q1 with action items for Q2")
+
+    assert len(llm.repair_calls) == 2
+    assert any(isinstance(block, ActionItems) for block in result.blocks)
+
+
+def test_ac_core_1_failed_repair_shows_the_query_results_and_a_failed_outcome(
+    make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse, settings: Settings, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    # Live runs, traces 686d2f07 and 663550b1: the repair failed, and the Executive got
+    # "I have no answer" although the queries had rows. The Turn was recorded as answered.
+    warehouse.on("FORMAT_DATE", columns=["month", "revenue"], rows=[["2026-01", 10.0], ["2026-02", 12.0]])
     llm = ScriptedLLM(call("run_query", sql=MONTHLY_SQL), text(BROKEN_REPORT), intent="report")
     api = make_api(llm)
     session = api.start_session("mgr_ana")
 
     result = api.send_message(session.session_id, "Create a report for Q1 with action items for Q2")
 
+    notice = result.blocks[0]
+    assert isinstance(notice, Notice) and notice.level == "warning"
+    assert [block.total_rows for block in result.blocks if isinstance(block, Table)] == [2]
     plain(result)
-    output = capsys.readouterr().out
-    assert '"blocks"' not in output and "ask it in a different way" in output
+    assert '"blocks"' not in capsys.readouterr().out
+    assert spans(settings, "turn")[-1]["attributes"]["turn.outcome"] == "failed"
+
+
+def test_ac_core_1_failed_repair_with_no_results_gives_an_error_notice(
+    make_api: Callable[..., TurnAPI], settings: Settings
+) -> None:
+    llm = ScriptedLLM(text(BROKEN_REPORT), intent="report")
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Create a report for Q1 with action items for Q2")
+
+    notice = result.blocks[0]
+    assert isinstance(notice, Notice) and notice.level == "error" and notice.trace_id == result.provenance.trace_id
+    assert spans(settings, "turn")[-1]["attributes"]["turn.outcome"] == "failed"
 
 
 def test_ac_core_1_table_with_more_than_20_rows_shows_20_and_the_filter_hint(
@@ -283,3 +334,47 @@ def test_ac_core_1_sql_command_shows_the_final_sql_bytes_and_rows_with_no_llm(
         input="/sql\n/exit\n",
     )
     assert "The last Answer ran no SQL" in output.output
+
+
+def test_ac_core_1_kpi_has_a_space_between_the_value_and_a_word_unit(capsys: pytest.CaptureFixture[str]) -> None:
+    # Live run, trace 16877e8b: the Q1 report showed "17,250.83USD" and "532orders".
+    plain(Answer(kind="answer", blocks=[
+        Kpi(label="Orders", value="532", unit="orders"),
+        Kpi(label="Growth", value="12", unit="%"),
+    ]))
+
+    output = capsys.readouterr().out
+    assert "532 orders" in output and "12%" in output
+
+
+@pytest.mark.parametrize(("value", "unit"), [("17,250.83", "USD"), ("17,250.83", "usd"), ("17,250.83", "$"), ("$17,250.83", "USD")])
+def test_ac_core_1_money_kpi_has_the_dollar_sign_before_the_value(
+    capsys: pytest.CaptureFixture[str], value: str, unit: str
+) -> None:
+    # cli.md fmt.money: the currency symbol comes before the value, as in the table cells.
+    plain(Answer(kind="answer", blocks=[Kpi(label="Revenue", value=value, unit=unit)]))
+
+    output = capsys.readouterr().out
+    assert "Revenue $17,250.83" in output
+    assert "usd" not in output.lower() and "$$" not in output
+
+
+@pytest.mark.parametrize("fence", [False, True])
+def test_ac_core_1_prose_before_the_answer_json_becomes_a_text_block(
+    make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse, capsys: pytest.CaptureFixture[str], fence: bool
+) -> None:
+    # Live run, trace 14c308ba: the model wrote two paragraphs, then the JSON object. The CLI
+    # showed the raw JSON.
+    warehouse.on("FORMAT_DATE", columns=["month", "revenue"], rows=[["2026-01", 10.0]])
+    body = '{"blocks": [{"type": "table", "query_id": "q1"}], "assumptions": []}'
+    draft = "Calvin Klein sells fewer, more expensive items.\n\n" + (f"```json\n{body}\n```" if fence else body)
+    llm = ScriptedLLM(call("run_query", sql=MONTHLY_SQL), text(draft))
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Compare the two brands")
+
+    assert isinstance(result.blocks[0], Text_) and result.blocks[0].markdown == "Calvin Klein sells fewer, more expensive items."
+    assert isinstance(result.blocks[1], Table)
+    plain(result)
+    assert '"blocks"' not in capsys.readouterr().out and llm.repair_calls == []

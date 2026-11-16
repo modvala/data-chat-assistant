@@ -204,7 +204,7 @@ confirm ›
 ```
 
 - For one report, the reply is `yes`. For two or more reports, the reply is `delete` and the count, for example `delete 2`.
-- Any other message cancels the delete: you see `Nothing was deleted.`, and the agent answers your message as a normal question.
+- Any other message cancels the delete: you see `Nothing was deleted.`, and the agent answers your message as a normal question. A reply such as `no, keep them` gets only the notice.
 - A command, such as `/list`, does not cancel. `/list` shows the reports of the delete.
 - The request expires after the time in the panel. Then nothing is deleted.
 
@@ -243,6 +243,13 @@ When the agent cannot answer, you get an error notice with the trace ID:
 ```
 
 A question that needs many steps can use all the steps that one question has. If the agent found data before the last step, you get an Answer from that data. The Answer tells which part of your question the data does not answer.
+
+Sometimes the agent cannot write the text of the Answer after its queries ran. Then you see the query results under a warning:
+
+```text
+▌ ! I could not write the analysis
+▌ Here are the results of the queries. Ask again for the analysis.
+```
 
 To stop a question while the agent works, press `Ctrl+C`. You see `Cancelled`, and the prompt comes back. At the prompt, `Ctrl+C` ends the session.
 

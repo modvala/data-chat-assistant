@@ -550,7 +550,7 @@ flowchart LR
 | --- | --- | --- |
 | Size and format | Rules: maximum length, no binary content | Refusal `not_analysis` |
 | Known injection patterns | Rules: "ignore previous instructions", requests for the system prompt | Refusal `not_analysis` |
-| Intent | `gemini-3.5-flash-lite` with structured output: `analysis`, `schema_question`, `report`, `delete`, `profile`, `other`. The classifier also gets the last answered questions of the session (`limits.classifier_questions`, default 3), so that a follow-up such as "explain that in more detail" is `analysis`. A refused message does not come back. | `other` gets a refusal `not_analysis` |
+| Intent | `gemini-3.5-flash-lite` with structured output: `analysis`, `schema_question`, `report`, `delete`, `profile`, `other`. The classifier also gets the last answered questions of the session (`limits.classifier_questions`, default 3), so that a follow-up such as "explain that in more detail" is `analysis`. A refused message does not come back. A reply to a delete preview gets no earlier questions, because it is not a follow-up. | `other` gets a refusal `not_analysis` |
 | Prompt injection and jailbreak | Model Armor (production) | Refusal `not_analysis` |
 
 The Input guard is only the first filter. The safety of the data does not depend on it, because the SQL guard and the warehouse apply the rules again.
@@ -775,7 +775,7 @@ stateDiagram-v2
     Pending --> Deleted: exact reply, same Executive, session and ID-set hash, before expiry
     Pending --> Cancelled: any other message
     Pending --> Expired: TTL ends
-    Cancelled --> Idle: the message runs as a normal Turn
+    Cancelled --> Idle: the message runs as a normal Turn,<br/>or ends there when it is not analysis
     Expired --> Idle
     Deleted --> Restored: /undo in the Undo window
     Deleted --> Purged: purge job after the retention period
@@ -791,7 +791,7 @@ stateDiagram-v2
 | Expected reply | 1 Saved Report: `yes`. 2 or more: `delete <count>`, for example `delete 7` (AC-R3.1). |
 | Binding | The pending confirmation holds the Executive ID, the session ID and a hash of the sorted Saved Report IDs. This binding is internal: the Executive does not type it. A change of the set makes the confirmation invalid, and the code makes a new preview. |
 | Expiry | 5 minutes (V11). |
-| Cancel | Any other message cancels. Then the message runs as a normal Turn. A command does not cancel ([section 6.2](#62-routing-of-input)). |
+| Cancel | Any other message cancels. Then the message runs as a normal Turn. When the intent classifier finds that the message is not analysis, for example "no, keep them", the Turn ends with only the notice, with no refusal. A rule hit of the Input guard still gets its refusal. A command does not cancel ([section 6.2](#62-routing-of-input)). |
 | Delete | Soft delete: `deleted_at` and `delete_batch_id`. Nothing is removed. An audit log entry for each delete and each undo. |
 | Undo | `/undo` restores the last delete batch of the Executive in the Undo window of 24 hours (A8, AC-R3.3). |
 | Purge | A scheduled job removes the content 30 days after the soft delete (V12). The audit entry stays (V14). |
@@ -1179,7 +1179,7 @@ flowchart LR
 | Fallback model | `gemini-3.5-flash-lite` | The Provenance has `fallback_used`. The CLI shows "backup model" ([cli.md P-FAIL](cli.md#p-fail-service-failure-and-fallback)). |
 | Circuit breaker (production) | Opens after 5 failures in 60 s, tries again after 30 s (V10) | When it is open, the call goes to the fallback at once. |
 
-The fallback model runs the Turn again from the start. Its BigQuery jobs get new job IDs, because BigQuery rejects a job ID that it has seen (409).
+The fallback model runs the Turn again from the start. Its BigQuery jobs get new job IDs, because BigQuery rejects a job ID that it has seen (409). When the fallback model also fails after its queries returned rows, the Executive gets the tables of those queries with a warning notice, not only an error notice.
 
 ### 15.3 Failures and what the Executive sees
 
@@ -1192,7 +1192,7 @@ The fallback model runs the Turn again from the start. Its BigQuery jobs get new
 | Embedding or vector search down | Exception | Continue with no Trios | A normal Answer with no Trio IDs. The trace records the degradation. |
 | State store write fails (production) | Exception | Retry. The Turn fails before the Answer if it cannot save the session. | Error notice |
 | Trace exporter fails | Exception | Spans go to a local buffer. A trace failure never fails a Turn. | Nothing |
-| The final Answer is JSON that does not parse | `json.loads` fails on text that starts with `{` | One repair call on the fallback model, with structured output. It counts in the Turn budget. | A normal Answer. If the repair fails: a short text that asks for a different wording. Never raw JSON. |
+| The final Answer is JSON that does not parse | `json.loads` fails on text that starts with `{` | One repair call on the fallback model, with structured output and backoff. It counts in the Turn budget. | A normal Answer. If the repair fails: the tables of the query results with a warning notice, or an error notice when there are no results. The outcome is `failed`. Never raw JSON. |
 | Bug in our code | Any exception | The Turn error handler catches it | Error notice with the `trace_id`. The CLI does not stop. |
 
 The error notice has no stack trace, no HTTP code and no vendor name ([cli.md P-FAIL](cli.md#p-fail-service-failure-and-fallback)).

@@ -76,11 +76,15 @@ class ScriptedLLM:
         self.classifier_failures = 0  # the first n classifier calls fail with a 429
         self.repairs: list[str] = []  # the replies to the JSON repair calls; none left gives a 503
         self.repair_calls: list[tuple[str, str]] = []
+        self.repair_failures = 0  # the first n repair calls fail with a 429
 
     # LLMClient port
     def generate(self, prompt: str, *, model: str, system: str = "", json_schema: dict | None = None) -> LLMResult:
         if json_schema is not None and "intent" not in json_schema.get("properties", {}):
             self.repair_calls.append((model, prompt))
+            if self.repair_failures:
+                self.repair_failures -= 1
+                raise LLMTransientError(429)
             if not self.repairs:
                 raise LLMTransientError(503)
             return LLMResult(text=self.repairs.pop(0), tokens_in=50, tokens_out=50)
