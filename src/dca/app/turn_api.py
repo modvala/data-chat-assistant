@@ -15,7 +15,8 @@ from typing import Any
 import sqlglot
 
 from dca.config import Settings
-from dca.core import backoff, confirmation, context, drafting, input_guard, messages, reports
+from dca.core import backoff, budget, confirmation, context, drafting, input_guard, messages, reports
+from dca.core.budget import TurnBudget
 from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, Result, SqlView, Text
 from dca.core.ports import (
     AuditEntry,
@@ -33,7 +34,7 @@ from dca.core.ports import (
 )
 from dca.core.demographic import THRESHOLD_VIEW
 from dca.core.state import QueryHandle, SessionState, TurnRecord
-from dca.core.turn import DateRange, ThresholdState, TurnContext, TurnFinish, TurnStop
+from dca.core.turn import DateRange, ThresholdState, TurnCancelled, TurnContext, TurnFinish, TurnStop
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
@@ -123,6 +124,7 @@ class TurnAPI:
         self.reports = report_store
         self.clock = clock
         self._dates: DateRange | None = None
+        self._active: dict[str, tuple[TurnContext, asyncio.AbstractEventLoop | None, asyncio.Task | None]] = {}
         self.access = AccessResolver(config_store, warehouse, settings)
         project, dataset = settings.google_cloud_project, settings.warehouse.threshold_dataset
         self.threshold = ThresholdState(f"{project}.{dataset}.{THRESHOLD_VIEW}" if project else None)
@@ -167,8 +169,10 @@ class TurnAPI:
                     threshold=self.threshold,
                     reports=self.reports,
                     now=self.clock(),
+                    budget=TurnBudget(self.settings.budget),
                 )
-                decision = self._input_guard(text, progress)
+                self._active[session_id] = (turn, None, None)
+                decision = self._input_guard(text, progress, turn)
                 if decision.blocked:
                     answer = self._refusal(turn, TurnStop("not_analysis", decision.reason))
                     outcome = "refused"
@@ -181,6 +185,9 @@ class TurnAPI:
                 answer.blocks = gate_notices + answer.blocks
             except _GateDone:
                 pass
+            except TurnCancelled:
+                answer = Answer(kind="notice", blocks=[Notice(level="info", title="Cancelled", body="Your session continues.")])
+                outcome = "cancelled"
             except Exception as error:  # noqa: BLE001 - the Turn error handler (P15)
                 self.tracer.log("turn.error", error=type(error).__name__)
                 answer = Answer(
@@ -188,13 +195,29 @@ class TurnAPI:
                 )
                 outcome = "failed"
             span.set("turn.outcome", outcome)
+            if turn is not None and turn.budget is not None:
+                span.set("budget.llm_calls", turn.budget.llm_calls)
+                span.set("budget.llm_tokens", turn.budget.llm_tokens)
+                span.set("budget.bytes", turn.budget.bytes_scanned)
+            if turn is not None and turn.stop_limit:
+                span.set("budget.limit", turn.stop_limit)
+            self._active.pop(session_id, None)
         answer.provenance.trace_id = answer.provenance.trace_id or trace_id
         answer.awaiting_confirmation = state.pending is not None
         self._record(state, text, answer, outcome, turn)
         return answer
 
     def cancel(self, session_id: str) -> None:
-        """Ctrl+C. The full cancel comes with the Turn budgets (#22)."""
+        """Ctrl+C: stops the running Turn of the session and its BigQuery job (HLD 15.5)."""
+        active = self._active.get(session_id)
+        if active is None:
+            return
+        turn, loop, task = active
+        turn.cancelled = True
+        if turn.running_job:
+            self.warehouse.cancel(turn.running_job)
+        if loop is not None and task is not None:
+            loop.call_soon_threadsafe(task.cancel)
 
     def command(self, session_id: str, name: str, args: str = "") -> Answer:
         state = self._load(session_id)
@@ -254,15 +277,19 @@ class TurnAPI:
         result = Result(action="deleted", count=len(ids), undo_until=undo_until)
         return Answer(kind="answer", blocks=[result]), "done", []
 
-    def _input_guard(self, text: str, progress: ProgressCallback) -> input_guard.InputDecision:
+    def _input_guard(self, text: str, progress: ProgressCallback, turn: TurnContext) -> input_guard.InputDecision:
         with self.tracer.span("guard.input") as span:
             reason = input_guard.check_rules(text, self.settings.limits.input_max_chars)
             if reason is not None:
                 decision = input_guard.InputDecision("other", reason)
             else:
                 try:
+                    if turn.budget:
+                        turn.budget.before_llm_call()
                     intent, tokens = self._classify(text, progress)
                     span.set("tokens", tokens)
+                    if turn.budget:
+                        turn.budget.add_tokens(tokens)
                     decision = input_guard.InputDecision(intent, "intent" if intent == "other" else "")
                 except Exception as error:  # noqa: BLE001 - the classifier is only the first filter
                     span.set("error", type(error).__name__)
@@ -342,9 +369,8 @@ class TurnAPI:
                 turn.queries.clear()
                 turn.attempts.clear()
             try:
-                # A copied context: the ADK run must not leave its span as the current span.
-                final = contextvars.copy_context().run(
-                    asyncio.run,
+                final = self._run_agent(
+                    turn,
                     self.agent_loop.run(
                         turn, instruction=instruction, message=text, model=model, fallback_used=fallback_used
                     ),
@@ -356,17 +382,38 @@ class TurnAPI:
             except TurnStop as stop:
                 return self._refusal(turn, stop), "refused"
             except TurnFinish as finish:
+                turn.stop_limit = finish.stop_limit
                 return finish.answer, finish.outcome
         answer = drafting.answer_from_draft(final, turn, model=model, fallback_used=fallback_used)
         return answer, "refused" if any(isinstance(block, Refusal) for block in answer.blocks) else "answered"
 
+    def _run_agent(self, turn: TurnContext, coroutine: Any) -> str:
+        """Runs the Agent loop inside the rest of the wall-time budget. Ctrl+C cancels the task."""
+
+        async def main() -> str:
+            self._active[turn.session.session_id] = (turn, asyncio.get_running_loop(), asyncio.current_task())
+            remaining = turn.budget.remaining_s() if turn.budget else None
+            try:
+                return await asyncio.wait_for(coroutine, timeout=remaining)
+            except TimeoutError:
+                raise TurnStop("budget", "wall_time") from None
+            except asyncio.CancelledError:
+                raise TurnCancelled() from None
+
+        # A copied context: the ADK run must not leave its span as the current span.
+        return contextvars.copy_context().run(asyncio.run, main())
+
     def _refusal(self, turn: TurnContext, stop: TurnStop) -> Answer:
-        self.tracer.log("turn.refusal", reason=stop.reason)
-        return Answer(
+        self.tracer.log("turn.refusal", reason=stop.reason, limit=stop.detail if stop.reason == "budget" else "")
+        body = budget.LIMIT_TEXT.get(stop.detail) if stop.reason == "budget" else None
+        answer = Answer(
             kind="notice",
-            blocks=[messages.refusal(stop.reason)],
+            blocks=[messages.refusal(stop.reason, body)],
             provenance=drafting.provenance(turn, model=self.settings.model),
         )
+        if stop.reason == "budget":
+            turn.stop_limit = stop.detail
+        return answer
 
     def _record(self, state: SessionState, text: str, answer: Answer, outcome: str, turn: TurnContext | None) -> None:
         query_ids = []

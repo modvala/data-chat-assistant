@@ -3,12 +3,15 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dca.config import Settings
 from dca.core.answer import Answer, RefusalReason
 from dca.core.ports import Grant, ReportStore, Tracer, Warehouse
 from dca.core.state import SessionState, SqlAttempt
+
+if TYPE_CHECKING:
+    from dca.core.budget import TurnBudget
 
 Progress = Callable[[str, dict[str, Any]], None]
 
@@ -25,10 +28,15 @@ class TurnStop(Exception):
 class TurnFinish(Exception):
     """Ends the Agent loop with an Answer that our code made, for example a delete preview."""
 
-    def __init__(self, answer: Answer, outcome: str) -> None:
+    def __init__(self, answer: Answer, outcome: str, stop_limit: str | None = None) -> None:
         super().__init__(outcome)
         self.answer = answer
         self.outcome = outcome
+        self.stop_limit = stop_limit
+
+
+class TurnCancelled(Exception):
+    """The Executive pressed Ctrl+C during the Turn."""
 
 
 @dataclass
@@ -78,6 +86,14 @@ class TurnContext:
     dates: DateRange | None = None
     reports: ReportStore | None = None
     now: datetime = field(default_factory=lambda: datetime.now(UTC))
+    budget: "TurnBudget | None" = None
+    cancelled: bool = False
+    running_job: str | None = None
+    stop_limit: str | None = None  # the budget limit that stopped the Turn, for the trace
+
+    def check_cancel(self) -> None:
+        if self.cancelled:
+            raise TurnCancelled()
     queries: dict[str, QueryRun] = field(default_factory=dict)
     attempts: list[SqlAttempt] = field(default_factory=list)
 

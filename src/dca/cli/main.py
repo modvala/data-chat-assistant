@@ -2,6 +2,7 @@
 
 import os
 import sys
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -11,6 +12,7 @@ from rich.console import Console
 from dca.app.turn_api import TurnAPI, UnknownExecutive
 from dca.cli.render import THEME, Mode, Renderer
 from dca.config import Settings
+from dca.core.answer import Answer
 
 ApiFactory = Callable[[Settings], TurnAPI]
 
@@ -89,9 +91,35 @@ def repl(api: TurnAPI, session_id: str, renderer: Renderer, console: Console) ->
         else:
             number += 1
             renderer.separator(number)
-            answer = api.send_message(session_id, text)
+            answer = run_turn(api, session_id, text)
         renderer.answer(answer)
         pending = answer.awaiting_confirmation
+
+
+def _wait(done: threading.Event) -> None:
+    # Not Thread.join(): a KeyboardInterrupt in join() can break the thread state, and
+    # is_alive() then returns False before the Turn ends.
+    done.wait(0.1)
+
+
+def run_turn(api: TurnAPI, session_id: str, text: str) -> Answer:
+    """Runs one Turn in a worker thread. Ctrl+C during the Turn cancels only the Turn (cli.md C2)."""
+    result: dict[str, Answer] = {}
+    done = threading.Event()
+
+    def work() -> None:
+        try:
+            result["answer"] = api.send_message(session_id, text)
+        finally:
+            done.set()
+
+    threading.Thread(target=work, daemon=True).start()
+    while not done.is_set():
+        try:
+            _wait(done)
+        except KeyboardInterrupt:
+            api.cancel(session_id)
+    return result["answer"]
 
 
 app = make_app()
