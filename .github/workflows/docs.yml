@@ -32,7 +32,7 @@ jobs:
           # The git-revision-date-localized plugin reads the date of each page from the git history.
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
 
