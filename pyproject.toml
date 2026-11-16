@@ -19,6 +19,7 @@ dependencies = [
 [project.scripts]
 chat = "dca.cli.main:main"
 setup-bq = "dca.setup_bq:main"
+dca-metrics = "dca.metrics:main"
 
 [build-system]
 requires = ["hatchling"]

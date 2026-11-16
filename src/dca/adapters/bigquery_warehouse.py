@@ -60,7 +60,8 @@ class BigQueryWarehouse:
     ) -> QueryResult:
         config = bigquery.QueryJobConfig(query_parameters=self._params(params), maximum_bytes_billed=max_bytes)
         try:
-            job = self.client.query(sql, job_config=config, job_id=job_id)
+            # job_retry=None: our core does the retries, each with a new job ID (V8).
+            job = self.client.query(sql, job_config=config, job_id=job_id, job_retry=None)
             rows = job.result(timeout=timeout_s)
         except gexc.BadRequest as error:
             if "cancel" in _message(error).lower():

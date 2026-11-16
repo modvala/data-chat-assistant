@@ -160,3 +160,16 @@ def test_ac_r7_1_a_failing_trace_exporter_does_not_fail_the_turn(
     result = api.send_message(api.start_session("mgr_ana").session_id, "Revenue?")
 
     assert result.kind == "answer" and result.provenance.trace_id
+
+
+def test_ac_r7_3_llm_row_is_ok_when_a_tool_ends_the_turn(make_api: Callable[..., TurnAPI]) -> None:
+    api = make_api(ScriptedLLM(call("run_query", sql="SELECT email FROM scoped_customers")))
+    session = api.start_session("mgr_ana").session_id
+    refused = api.send_message(session, "Show the emails")
+
+    view = trace_of(api, session, refused.provenance.trace_id)
+
+    assert [(row.label, row.status) for row in view.rows][1:3] == [
+        ("llm gemini-3.8-flash", "ok"),
+        ("sql validation", "refusal"),
+    ]

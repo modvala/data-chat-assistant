@@ -68,6 +68,11 @@ class Limits(BaseModel):
     input_max_chars: int
 
 
+class Cost(BaseModel):
+    llm_usd_per_1k_tokens: float
+    bq_usd_per_tib: float
+
+
 class Display(BaseModel):
     header_max_brands: int
     preview_max_items: int
@@ -99,6 +104,7 @@ class Settings(BaseSettings):
     timeout: Timeout
     confirmation: Confirmation
     limits: Limits
+    cost: Cost
     display: Display
 
     @classmethod

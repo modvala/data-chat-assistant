@@ -42,22 +42,42 @@ def string_filter(sql: str) -> Filter | None:
     return None
 
 
+CLOSE_MATCH = 0.8  # "Califronia" and "California": 0.9. "Boston" and "Houston": 0.67, no suggestion.
+
+
+def _count(found: Filter) -> str:
+    return "COUNT(DISTINCT id)" if found.view == SCOPED_CUSTOMERS.name else "COUNT(*)"
+
+
+def existence_sql(found: Filter) -> str:
+    """Is the exact value in the data? An aggregate, so the SQL guard routes it like any query."""
+    value = exp.Literal.string(found.literal).sql(dialect="bigquery")
+    return (
+        f"SELECT {found.column}, {_count(found)} AS n FROM {found.view} "
+        f"WHERE {found.column} = {value} GROUP BY {found.column}"
+    )
+
+
 def diagnostic_sql(found: Filter) -> str:
-    """An aggregate of the values of the filter column. The SQL guard routes it like any query."""
-    count = "COUNT(DISTINCT id)" if found.view == SCOPED_CUSTOMERS.name else "COUNT(*)"
-    return f"SELECT {found.column}, {count} AS n FROM {found.view} GROUP BY {found.column} ORDER BY n DESC"
+    """An aggregate of the most frequent values of the filter column."""
+    return f"SELECT {found.column}, {_count(found)} AS n FROM {found.view} GROUP BY {found.column} ORDER BY n DESC"
 
 
-def notice(found: Filter | None, values: list[str]) -> Answer:
-    if found is None:
+def close_value(found: Filter, values: list[str]) -> str | None:
+    by_lower = {value.lower(): value for value in values}
+    close = difflib.get_close_matches(found.literal.lower(), list(by_lower), n=1, cutoff=CLOSE_MATCH)
+    return by_lower[close[0]] if close else None
+
+
+def notice(found: Filter | None, values: list[str], *, exists: bool = False) -> Answer:
+    if found is None or exists:
         block = Notice(level="info", title="No data matches this question", body="Try a wider period or fewer filters.")
         return Answer(kind="notice", blocks=[block])
     word = "from" if found.column in PLACE_COLUMNS else f"with {found.column}"
     title = f'No orders {word} "{found.literal}"'
-    by_lower = {value.lower(): value for value in values}
-    close = difflib.get_close_matches(found.literal.lower(), list(by_lower), n=1, cutoff=0.6)
+    close = close_value(found, values)
     if close:
-        body = f"Did you mean {by_lower[close[0]]}?"
+        body = f"Did you mean {close}?"
     elif values:
         body = f"Some values in your data: {', '.join(values[:5])}. Ask again with one of them."
     else:

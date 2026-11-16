@@ -238,34 +238,45 @@ def _empty_result(turn: TurnContext, llm_sql: str, grant: Grant, *, demographic_
     demographic route, the threshold hid all groups: a refusal `threshold` (ADR 0005).
     """
     found = diagnostic.string_filter(llm_sql)
+    exists = False
     values: list[str] = []
     if found is not None:
         with turn.tracer.span("bq.diagnostic", column=found.column) as span:
-            verdict = sql_guard.check(
-                diagnostic.diagnostic_sql(found),
-                grant,
-                source_dataset=turn.settings.warehouse.source_dataset,
-                sql_limit=turn.settings.limits.sql_limit,
-                threshold_view=turn.threshold.view,
-                threshold_k=turn.settings.warehouse.threshold_k,
-            )
-            span.set("route", getattr(verdict, "route", "blocked"))
-            if isinstance(verdict, sql_guard.Allowed):
-                try:
-                    result = turn.warehouse.run(
-                        verdict.sql,
-                        verdict.params,
-                        max_bytes=turn.settings.budget.query_bytes,
-                        timeout_s=turn.settings.timeout.bq_job_s,
-                        job_id=f"dca-diag-{turn.trace_id}-{len(turn.attempts)}",
-                    )
-                    values = [str(row[0]) for row in result.rows if row[0] is not None]
-                except (WarehouseError, WarehouseTransientError) as error:
-                    span.set("error", type(error).__name__)
+            exists = bool(_diagnostic_values(turn, grant, diagnostic.existence_sql(found), "exists"))
+            if not exists:
+                values = _diagnostic_values(turn, grant, diagnostic.diagnostic_sql(found), "values")
+            span.set("exists", exists)
             span.set("values", len(values))
-    if demographic_route and (found is None or not values or found.literal in values):
+    suggestion = diagnostic.close_value(found, values) if found else None
+    if demographic_route and suggestion is None:
+        # The value exists, or a small group can hide it: never guess a typo here (ADR 0005).
         raise TurnStop("threshold")
-    raise TurnFinish(diagnostic.notice(found, values), "answered")
+    raise TurnFinish(diagnostic.notice(found, values, exists=exists), "answered")
+
+
+def _diagnostic_values(turn: TurnContext, grant: Grant, sql: str, step: str) -> list[str]:
+    """The values of the first column of a diagnostic query, through the SQL guard. Best effort."""
+    verdict = sql_guard.check(
+        sql,
+        grant,
+        source_dataset=turn.settings.warehouse.source_dataset,
+        sql_limit=turn.settings.limits.sql_limit,
+        threshold_view=turn.threshold.view,
+        threshold_k=turn.settings.warehouse.threshold_k,
+    )
+    if not isinstance(verdict, sql_guard.Allowed):
+        return []
+    try:
+        result = turn.warehouse.run(
+            verdict.sql,
+            verdict.params,
+            max_bytes=turn.settings.budget.query_bytes,
+            timeout_s=turn.settings.timeout.bq_job_s,
+            job_id=f"dca-diag-{turn.trace_id}-{len(turn.attempts)}-{step}",
+        )
+    except (WarehouseError, WarehouseTransientError):
+        return []
+    return [str(row[0]) for row in result.rows if row[0] is not None]
 
 
 def jsonable(value: Any) -> Any:
