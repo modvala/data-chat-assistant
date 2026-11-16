@@ -60,7 +60,7 @@ def saved_notice(report: SavedReport | None) -> Answer:
     return Answer(kind="notice", blocks=[notice])
 
 
-def list_answer(reports: list[SavedReport]) -> Answer:
+def list_answer(reports: list[SavedReport], title: str = "Your Saved Reports") -> Answer:
     if not reports:
         notice = Notice(level="info", title="You have no Saved Reports", body="Type /save after an Answer to keep it.")
         return Answer(kind="notice", blocks=[notice])
@@ -70,4 +70,4 @@ def list_answer(reports: list[SavedReport]) -> Answer:
         rows=[[report.title, report.created_at.date().isoformat()] for report in reports],
         total_rows=len(reports),
     )
-    return Answer(kind="answer", blocks=[Heading(source="code", text="Your Saved Reports"), table])
+    return Answer(kind="answer", blocks=[Heading(source="code", text=title), table])

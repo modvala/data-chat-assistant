@@ -6,16 +6,18 @@
 | run_query | read, with the SQL guard |
 | save_report | write-own |
 | list_reports | read-own |
+| plan_delete | plan: changes nothing, the Confirmation gate deletes |
 """
 
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from dca.core import demographic, reports, sql_guard
+from dca.core import confirmation, demographic, reports, sql_guard
+from dca.core.answer import Answer, Notice
 from dca.core.ports import Grant, KnowledgeStore, WarehouseError
 from dca.core.state import SqlAttempt
-from dca.core.turn import QueryRun, TurnContext, TurnStop
+from dca.core.turn import QueryRun, TurnContext, TurnFinish, TurnStop
 
 
 def describe_schema(knowledge: KnowledgeStore) -> dict[str, Any]:
@@ -31,6 +33,36 @@ def save_report(turn: TurnContext, title: str, grant: Grant) -> dict[str, Any]:
     if report is None:
         return {"error": "There is no earlier Answer to save."}
     return {"saved": True, "title": report.title}
+
+
+def plan_delete(
+    turn: TurnContext, grant: Grant, *, customer_ids: list[str], this_conversation: bool, customer_name: str
+) -> dict[str, Any]:
+    """Finds the own Saved Reports that match and makes a preview. It changes nothing (ADR 0002)."""
+    assert turn.reports is not None
+    if not customer_ids and not this_conversation:
+        if customer_name.strip():
+            notice = Notice(
+                level="info",
+                title="I need the Customer ID",
+                body="Saved Reports record Customers by ID only. Type the request again with the Customer ID, "
+                "for example: Delete all reports mentioning Customer 4521.",
+            )
+            raise TurnFinish(Answer(kind="notice", blocks=[notice]), "answered")
+        return {"error": "Give customer_ids, or set this_conversation to true."}
+    answer, pending = confirmation.plan(
+        turn.reports,
+        owner_id=grant.executive_id,
+        session_id=turn.session.session_id,
+        customer_ids=customer_ids,
+        this_conversation=this_conversation,
+        now=turn.now,
+        settings=turn.settings,
+    )
+    turn.session.pending = pending
+    with turn.tracer.span("confirmation", state="pending" if pending else "no_match") as span:
+        span.set("count", len(pending.report_ids) if pending else 0)
+    raise TurnFinish(answer, "pending" if pending else "answered")
 
 
 def list_reports(turn: TurnContext, grant: Grant) -> dict[str, Any]:

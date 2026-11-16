@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from dca.config import Settings
-from dca.core.answer import RefusalReason
+from dca.core.answer import Answer, RefusalReason
 from dca.core.ports import Grant, ReportStore, Tracer, Warehouse
 from dca.core.state import SessionState, SqlAttempt
 
@@ -20,6 +20,15 @@ class TurnStop(Exception):
         super().__init__(reason)
         self.reason = reason
         self.detail = detail
+
+
+class TurnFinish(Exception):
+    """Ends the Agent loop with an Answer that our code made, for example a delete preview."""
+
+    def __init__(self, answer: Answer, outcome: str) -> None:
+        super().__init__(outcome)
+        self.answer = answer
+        self.outcome = outcome
 
 
 @dataclass

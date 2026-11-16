@@ -104,7 +104,26 @@ class AdkAgentLoop:
             """List the Saved Reports of the Executive, with titles and dates."""
             return tools.list_reports(turn, _grant(tool_context.state))
 
-        return [run_query, describe_schema, save_report, list_reports]
+        def plan_delete(
+            tool_context: ToolContext,
+            customer_ids: list[str] | None = None,
+            this_conversation: bool = False,
+            customer_name: str = "",
+        ) -> dict:
+            """Plan a delete of Saved Reports. It deletes nothing: the Executive must confirm.
+
+            Give customer_ids for "reports mentioning Customer X", or this_conversation=true for
+            "reports we made in this conversation". If the Executive names a Customer by name, give customer_name.
+            """
+            return tools.plan_delete(
+                turn,
+                _grant(tool_context.state),
+                customer_ids=[str(cid) for cid in customer_ids or []],
+                this_conversation=this_conversation,
+                customer_name=customer_name,
+            )
+
+        return [run_query, describe_schema, save_report, list_reports, plan_delete]
 
     async def run(
         self, turn: TurnContext, *, instruction: str, message: str, model: str, fallback_used: bool = False
