@@ -55,12 +55,14 @@ Outline:
    | Golden Bucket: learns from your analysts | Hybrid intelligence | A golden dataset of approved expert analyses (question, SQL, report), retrieval of similar ones, the analyst review loop |
    | Persona: the CEO sets the tone | Persona | Edit form, versions, preview and rollback, safety layer locked |
    | Evaluation: checked before release | Quality | Eval set with reference SQL in CI, LLM judge, side-by-side UX test |
-   | Ready for Google Cloud | Production design | Cloud Run, IAP, Firestore, Sensitive Data Protection and Model Armor in one diagram; no badge |
+   | Ready for Google Cloud (after the System design and CLI design blocks) | Production design | Cloud Run, IAP, Firestore, Sensitive Data Protection and Model Armor in one diagram; no badge |
 
    A "Coming next" section says what the feature will do, in two or three sentences.
-4. **Also designed:** one short list of the other designed features with no code, one line each. Take them from the HLD (§12.4 Metric catalog, §23 extension points, §26) and the coverage extras: for example the Metric catalog, the result cache, the circuit breaker, Saved Reports by email, a web chat on the same API, and the review console for analysts.
-5. **Try it:** relative links to the Demo tour and Get started, and to the Executive guide.
-6. **Footer:** one line, "For engineers: the full design is on GitHub", with one link to the repository.
+4. **System design:** a block after "Evaluation" and before "Ready for Google Cloud". One architecture diagram with 10 nodes or fewer (from HLD §4.1: the Executive, the CLI, the checks before and after the language model, the agent, the language model as not trusted, the sales warehouse, the stores). Then the main design ideas, one line each, from `docs/design-principles.md`: the language model is not trusted; safety is in the code and in the data, not in the prompt (P8); the language model never sees raw personal data (P9); the language model only plans a delete, and the code does it (P11); ports and adapters, so the same core runs in the prototype and on Google Cloud (P6); configuration, not code (P17). No principle IDs on the page.
+5. **CLI design:** a block after "System design". From `docs/design/cli.md` and the code: the parts of the screen (session header, prompt, status line, Answer panel, provenance line) in one example session in a `text` block; the symbols and what each one means (for example ✓ ⊘ ⚠ ▲ ▼ ◆); the color roles in one sentence; the Answer components (KPI row, table, Action items, notice, confirmation panel, trace view); accessibility (each status has a word and a symbol, not only a color; plain, ASCII and no-color modes). Where `cli.md` and the code differ, the code wins. The feature section "The terminal chat (CLI)" stays short and links to this block, not to the guide; the full command list stays in the Executive guide.
+6. **Also designed:** one short list of the other designed features with no code, one line each. Take them from the HLD (§12.4 Metric catalog, §23 extension points, §26) and the coverage extras: for example the Metric catalog, the result cache, the circuit breaker, Saved Reports by email, a web chat on the same API, and the review console for analysts.
+7. **Try it:** relative links to the Demo tour and Get started, and to the Executive guide.
+8. **Footer:** one line, "For engineers: the full design is on GitHub", with one link to the repository.
 
 ## How it works (`how-it-works.md`)
 

@@ -58,7 +58,7 @@ Check the code, not the Mark column: a Bonus item with code is **Available now**
 ### Examples
 
 - An example input is one shell command, one question or one CLI command in its own `bash` or `text` code block. Material adds a copy button to each block.
-- An example output is in a `text` block. It shows the **shape** of the Answer, with no figures from the data. The data is synthetic and it changes (P19). The one exception is the Home hero (see PAGES.md).
+- An example output is in a `text` block. It shows the **shape** of the Answer, with no figures from the data. The data is synthetic and it changes (P19). The exceptions are the Home hero and the example session of the CLI design block on Home (see PAGES.md). They use invented figures, and a line says so.
 - Number the inputs of one Demo tour scenario (1, 2, 3), and use the same numbers in "What you see". A key press, such as `Ctrl+C`, or another reply to the same prompt can be in the text.
 - Each example must run on the CLI on `main`. An input counts as tested when it ran on the CLI, or when it is the same input as a tested Demo tour scenario. If you cannot run it, say so on the status line and in the report.
 

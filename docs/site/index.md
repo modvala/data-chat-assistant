@@ -117,7 +117,7 @@ Each Answer ends with a provenance line: your Brand scope, the assumptions of th
 
 **Available now**
 
-Each session starts with a header that shows who you are and your Brand scope. While the agent works, a status line shows the step, such as `Writing SQL` or `Running the query`. Each Answer comes in a panel, with the provenance line under it.
+You see who you are and your Brand scope, a status line while the agent works, and each Answer in a panel. The chat only sends your message and draws the Answer, so all the logic stays in the agent.
 
 The main commands:
 
@@ -128,9 +128,7 @@ The main commands:
 - `/list`: show your Saved Reports.
 - `/undo`: bring back the reports of the last delete.
 
-Plain, ASCII and no-color modes make the chat work with screen readers, pipes and simple terminals. Each status has a word and a symbol, not only a color.
-
-[See all the commands and options in the Executive guide](guide.md#command-and-option-reference)
+[See the screen, the symbols and the modes for screen readers](#cli-design)
 
 ## Runs on any machine
 
@@ -174,6 +172,111 @@ The Persona is the tone and the content rules for all Answers, and the CEO will 
 **Coming next**
 
 A set of test questions with reference SQL will measure how often the agent gets the correct result, at each change in CI. A judge model will check that each Answer replies to the question, and labels from analysts will calibrate the judge. In a side-by-side test, Executives will select the better of two Answers.
+
+## System design
+
+Look at the path of a question: our checks are before and after the language model, and only our code goes to your data.
+
+```mermaid
+flowchart TB
+    EX[Executive] --> CLI[Terminal chat]
+    CLI --> IN["Checks before the<br/>language model"]
+    IN --> AG[Agent]
+    AG <-->|"context and drafts"| LM["Language model<br/>not trusted"]
+    AG --> SQ["SQL check<br/>adds your Brand scope"]
+    SQ --> WH[("Sales warehouse<br/>read-only")]
+    AG <--> ST[("Sessions, Saved Reports<br/>and knowledge")]
+    AG --> OUT[Check of the Answer]
+    OUT -->|Answer| CLI
+    style LM stroke-dasharray: 5 5
+```
+
+The main design ideas:
+
+- **The language model is not trusted:** it writes SQL and drafts the Answer, and our code checks all that it makes.
+- **Safety is in the code and in the data:** the checks and the Brand scope do not depend on the prompt.
+- **No raw personal data for the language model:** the agent never selects names, email addresses or street addresses, so the model cannot see them.
+- **The language model only plans a delete:** our code shows the preview, reads your reply and does the delete.
+- **One core for the prototype and for production:** the core uses each service through an adapter, so it runs on your computer and on Google Cloud.
+- **Configuration, not code:** the Persona, the instructions and the access rights are in files, so a change needs no new release.
+
+## CLI design
+
+The chat puts each part of the screen in the same place, and each status has a word and a symbol.
+
+### The screen
+
+This short session shows the session header, the prompt `you ›`, a status line, the Answer panel and the provenance line:
+
+```text
+◆ Data Chat Assistant
+  Executive mgr_maya · Manager · Brand scope: Ridgeway, Lunara
+  Type a question, or /help for commands.
+you › Which Lunara products had the most returns last quarter?
+──────────────────────────────────────────────────────────────────────────── 1
+⠋ Running the query
+╭─ ◆ Lunara returns, Q2 ─────────────────────────────────────────────────────╮
+│ Dresses had the most returns. Most of them were for the wrong size.        │
+│                                                                            │
+│                                                                            │
+│   Product type   Orders   Returns                                          │
+│  ─────────────────────────────────                                         │
+│   Dresses         2,196       312                                          │
+│   Jeans           1,908       187                                          │
+│   Tops            1,882        96                                          │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+  Scope: Ridgeway, Lunara · trace 4c8e1b7a · /sql
+  Assumed: "last quarter" = Q2
+you ›
+```
+
+An example with invented figures.
+
+- **Session header:** who you are, your role and your Brand scope.
+- **Prompt:** `you ›` waits for a question or a command. After a delete preview, it changes to `confirm ›`.
+- **Status line:** the step that the agent does now. It changes at each step and goes away when the Answer comes.
+- **Answer panel:** the title and the content of the Answer in one frame.
+- **Provenance line:** your Brand scope, the trace ID and the commands for the Answer. The assumptions of the agent are on the next line.
+
+### Symbols
+
+| Symbol | Meaning |
+| --- | --- |
+| `◆` | The agent: the session header, the title of an Answer and an information notice |
+| `✓` | Done, or a step that passed |
+| `✗` | An error, or a step that failed |
+| `⊘` | A refusal: the agent does not show this, for a safety reason |
+| `⚠` | A delete that waits for your reply |
+| `▲` `▼` | A figure went up or down |
+| `•` | An item in a list |
+| `▌` | The left bar of a notice or a refusal |
+| `›` | The prompt |
+| `·` | A separator between the parts of one line |
+
+### Colors
+
+Colors: cyan for titles and commands, green for done, yellow for warnings, red for errors and deletes, magenta for refusals, blue for the Brand scope.
+
+### Answer components
+
+- **KPI row:** the key figures, each with its change and the period.
+- **Table:** the figures from the query result, not from the language model. Numbers align to the right.
+- **Action items:** numbered next steps, each with a `Watch:` line that names the metric to watch.
+- **Notice:** a message with a left bar, for example an error. An error notice gives the trace ID and tells you that your session continues.
+- **Refusal:** a notice with `⊘`, the reason in plain words and what you can ask in its place.
+- **Confirmation panel:** a heavy red frame with `⚠`, the reports to delete and the exact reply to type.
+- **Trace view:** `/trace` shows each step of a question as a tree, with its result and its time.
+
+### Accessibility
+
+- **Color is never the only signal:** each status also has a word and a symbol.
+- **No color:** `--no-color` or the `NO_COLOR` setting removes all colors.
+- **Screen readers and pipes:** `--plain` prints text with no frames and no spinner, and tables as tab-separated values. When the output is not a terminal, the chat uses plain mode.
+- **No Unicode:** `--ascii` changes each symbol to plain characters, for example `✓` to `[ok]`. When the terminal cannot show Unicode, the chat does this itself.
+- **No motion:** `--no-animation` prints each step of the status as one line that stays.
+- **Light and dark terminals:** the chat uses only the standard terminal colors, so your terminal theme sets the real colors.
+- **Keyboard only:** each action is a command or text that you type.
 
 ## Ready for Google Cloud
 
