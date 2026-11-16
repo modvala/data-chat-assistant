@@ -56,6 +56,12 @@ Then ask a follow-up question. The agent keeps the earlier Answers of this sessi
 And how does it compare to the same months last year?
 ```
 
+You can also ask the agent to explain its last Answer:
+
+```text
+Can you explain that in more detail?
+```
+
 To get a report with Action items (recommended next steps, each with a metric to watch), ask for a report:
 
 ```text
@@ -235,6 +241,8 @@ When the agent cannot answer, you get an error notice with the trace ID:
 ▌ Please try again in a minute. Your session continues.
 ▌ trace <id>
 ```
+
+A question that needs many steps can use all the steps that one question has. If the agent found data before the last step, you get an Answer from that data. The Answer tells which part of your question the data does not answer.
 
 To stop a question while the agent works, press `Ctrl+C`. You see `Cancelled`, and the prompt comes back. At the prompt, `Ctrl+C` ends the session.
 
