@@ -8,6 +8,24 @@ repo_name: modvala/data-chat-assistant
 docs_dir: docs/site
 use_directory_urls: true
 
+# A link to a missing anchor fails the strict build.
+validation:
+  anchors: warn
+
+# The page specs are in .claude/skills/sync-simple-docs/PAGES.md.
+nav:
+  - Home: index.md
+  - Understand:
+      - How it works: how-it-works.md
+      - Requirements: requirements.md
+      - Key decisions: decisions.md
+  # Until #44 moves them to docs/site/, these pages link to their sources on github.com.
+  - Try it:
+      - Get started: https://github.com/modvala/data-chat-assistant/blob/main/README.md#setup
+      - Demo tour: https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md
+  - Use it:
+      - Executive guide: https://github.com/modvala/data-chat-assistant/blob/main/README.md#use
+
 theme:
   name: material
   features:
