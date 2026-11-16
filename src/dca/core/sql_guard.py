@@ -11,6 +11,7 @@ from sqlglot import exp
 from sqlglot.errors import OptimizeError, SqlglotError
 from sqlglot.optimizer.qualify import qualify
 
+from dca.core import demographic
 from dca.core.ports import Grant
 from dca.core.schema import CTE_PREFIX, PII_COLUMNS, SCOPED_VIEWS, cte_name, scoped_ctes, sqlglot_schema
 
@@ -21,6 +22,7 @@ SYNTAX_ERROR = "syntax_error"
 NOT_READ_ONLY = "not_read_only"
 RAW_TABLE = "raw_table"
 UNKNOWN_COLUMN = "unknown_column"
+UNSUPPORTED_DEMOGRAPHIC = "unsupported_demographic"
 
 # Refusal reasons: the Executive gets a refusal, and the LLM gets only "not permitted".
 PII = "pii"
@@ -31,6 +33,9 @@ _LLM_TEXT = {
     NOT_READ_ONLY: "Only one SELECT statement is permitted. No DML, DDL or scripts.",
     RAW_TABLE: "Use only the views scoped_order_items, scoped_orders and scoped_customers, with no dataset name.",
     UNKNOWN_COLUMN: "A column is not in the schema. Use only the columns of the scoped views. Detail: {detail}",
+    UNSUPPORTED_DEMOGRAPHIC: (
+        "A query on age, gender, state or city must be one aggregate SELECT with GROUP BY. Fix it: {detail}."
+    ),
 }
 
 _WRITE_NODES = (
@@ -51,6 +56,7 @@ class Allowed:
     sql: str
     params: dict[str, tuple[str, ...]]
     route: str = "scoped"
+    customer_columns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,7 +76,16 @@ def _technical(reason: str, detail: str = "") -> Blocked:
     return Blocked(reason=reason, detail=detail, llm_text=_LLM_TEXT[reason].format(detail=detail))
 
 
-def check(sql: str, grant: Grant, *, source_dataset: str, sql_limit: int) -> Verdict:
+def check(
+    sql: str,
+    grant: Grant,
+    *,
+    source_dataset: str,
+    sql_limit: int,
+    threshold_view: str | None = None,
+    threshold_k: int = 5,
+) -> Verdict:
+    """`threshold_view` is the full name of the threshold view, or None when it is not available."""
     try:
         statements = [s for s in sqlglot.parse(sql, read=DIALECT) if s is not None]
     except SqlglotError as error:
@@ -94,8 +109,22 @@ def check(sql: str, grant: Grant, *, source_dataset: str, sql_limit: int) -> Ver
     if not grant.all_brands and _brand_literals(tree) - {brand.lower() for brand in grant.brands}:
         return Blocked(reason=SCOPE, refusal=True, detail="brand literal outside the Brand scope")
 
+    params = {"brands": grant.brands}
+    if demographic.is_demographic(tree):
+        if demographic.is_row_list(tree):
+            return Blocked(reason=PII, refusal=True, detail="demographic row list")
+        found = demographic.shape(tree)
+        if isinstance(found, str):
+            return _technical(UNSUPPORTED_DEMOGRAPHIC, found)
+        _cap_limit(tree, sql_limit)
+        if threshold_view:
+            return Allowed(demographic.threshold_sql(tree, found, threshold_view), params, route="threshold_view")
+        demographic.add_having(tree, found, threshold_k)
+        return Allowed(_rewrite(tree, source_dataset), params, route="having_fallback")
+
     _cap_limit(tree, sql_limit)
-    return Allowed(sql=_rewrite(tree, source_dataset), params={"brands": grant.brands})
+    customers = demographic.customer_outputs(tree)
+    return Allowed(_rewrite(tree, source_dataset), params, customer_columns=customers)
 
 
 def _uses_pii(tree: exp.Query) -> bool:

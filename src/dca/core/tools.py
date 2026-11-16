@@ -10,7 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from dca.core import sql_guard
+from dca.core import demographic, sql_guard
 from dca.core.ports import Grant, KnowledgeStore, WarehouseError
 from dca.core.state import SqlAttempt
 from dca.core.turn import QueryRun, TurnContext, TurnStop
@@ -20,41 +20,64 @@ def describe_schema(knowledge: KnowledgeStore) -> dict[str, Any]:
     return {"schema": knowledge.schema()}
 
 
+def _guard(turn: TurnContext, sql: str, grant: Grant) -> sql_guard.Verdict:
+    settings = turn.settings
+    with turn.tracer.span("guard.sql") as span:
+        verdict = sql_guard.check(
+            sql,
+            grant,
+            source_dataset=settings.warehouse.source_dataset,
+            sql_limit=settings.limits.sql_limit,
+            threshold_view=turn.threshold.view,
+            threshold_k=settings.warehouse.threshold_k,
+        )
+        span.set("decision", "allowed" if isinstance(verdict, sql_guard.Allowed) else "blocked")
+        if isinstance(verdict, sql_guard.Blocked):
+            span.set("reason", verdict.reason)
+            span.set("detail", verdict.detail)
+        else:
+            span.set("route", verdict.route)
+    return verdict
+
+
+def _view_missing(error: Exception) -> bool:
+    text = str(error).lower()
+    return demographic.THRESHOLD_VIEW in text and ("not found" in text or "expired" in text)
+
+
 def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
     settings = turn.settings
     attempt = SqlAttempt(sql=sql)
     turn.attempts.append(attempt)
     with turn.tracer.span("tool.run_query", attempt=len(turn.attempts)):
         turn.progress("dry_run", {})
-        with turn.tracer.span("guard.sql") as span:
-            verdict = sql_guard.check(
-                sql, grant, source_dataset=settings.warehouse.source_dataset, sql_limit=settings.limits.sql_limit
-            )
-            span.set("decision", "allowed" if isinstance(verdict, sql_guard.Allowed) else "blocked")
+        while True:
+            verdict = _guard(turn, sql, grant)
             if isinstance(verdict, sql_guard.Blocked):
-                span.set("reason", verdict.reason)
-                span.set("detail", verdict.detail)
-            else:
-                span.set("route", verdict.route)
-        if isinstance(verdict, sql_guard.Blocked):
-            attempt.error = verdict.reason
-            if verdict.refusal:
-                raise TurnStop(verdict.reason)  # type: ignore[arg-type]
-            return {"error": verdict.llm_text}
-        attempt.final_sql = verdict.sql
+                attempt.error = verdict.reason
+                if verdict.refusal:
+                    raise TurnStop(verdict.reason)  # type: ignore[arg-type]
+                return {"error": verdict.llm_text}
+            attempt.final_sql = verdict.sql
 
-        with turn.tracer.span("bq.dry_run") as span:
-            try:
-                estimate = turn.warehouse.dry_run(verdict.sql, verdict.params)
-            except WarehouseError as error:
-                attempt.error = str(error)
-                span.set("error", str(error))
-                return {"error": f"The query failed in the dry run. Fix it. Detail: {error}"}
-            span.set("bytes", estimate)
-            if estimate > settings.budget.query_bytes:
-                span.set("over_limit", True)
-                attempt.error = "budget"
-                raise TurnStop("budget", "query bytes")
+            with turn.tracer.span("bq.dry_run") as span:
+                try:
+                    estimate = turn.warehouse.dry_run(verdict.sql, verdict.params)
+                except WarehouseError as error:
+                    span.set("error", str(error))
+                    if verdict.route == "threshold_view" and _view_missing(error):
+                        # ADR 0005: an expired view in the sandbox. Use the HAVING fallback from now on.
+                        turn.threshold.view = None
+                        turn.tracer.log("threshold_view.unavailable")
+                        continue
+                    attempt.error = str(error)
+                    return {"error": f"The query failed in the dry run. Fix it. Detail: {error}"}
+                span.set("bytes", estimate)
+                if estimate > settings.budget.query_bytes:
+                    span.set("over_limit", True)
+                    attempt.error = "budget"
+                    raise TurnStop("budget", "query bytes")
+            break
 
         turn.progress("query", {})
         query_id = turn.next_query_id()
@@ -75,6 +98,8 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
             span.set("bytes", result.bytes_processed)
             span.set("rows", len(rows))
             span.set("columns", result.columns)
+        if not rows and verdict.route != "scoped":
+            raise TurnStop("threshold")
 
     turn.queries[query_id] = QueryRun(
         query_id=query_id,
@@ -82,6 +107,7 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
         columns=result.columns,
         rows=rows,
         bytes_scanned=result.bytes_processed,
+        customer_columns=verdict.customer_columns,
     )
     return {
         "query_id": query_id,

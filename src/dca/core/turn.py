@@ -32,6 +32,13 @@ class QueryRun:
 
 
 @dataclass
+class ThresholdState:
+    """The full name of the threshold view, or None when it is not available (ADR 0005)."""
+
+    view: str | None
+
+
+@dataclass
 class TurnContext:
     grant: Grant
     session: SessionState
@@ -40,6 +47,7 @@ class TurnContext:
     warehouse: Warehouse
     tracer: Tracer
     progress: Progress
+    threshold: ThresholdState = field(default_factory=lambda: ThresholdState(None))
     queries: dict[str, QueryRun] = field(default_factory=dict)
     attempts: list[SqlAttempt] = field(default_factory=list)
 
