@@ -195,6 +195,7 @@ class TurnAPI:
                 "sql": self._cmd_sql,
                 "save": self._cmd_save,
                 "list": self._cmd_list,
+                "undo": self._cmd_undo,
             }.get(name)
             if handler is None:
                 blocks: list = [Notice(level="info", title="Unknown command", body="Type /help to see the commands.")]
@@ -389,6 +390,27 @@ class TurnAPI:
             matched = [r for r in self.reports.find(state.executive_id) if r.report_id in set(pending.report_ids)]
             return reports.list_answer(matched, title="These Saved Reports match the pending delete")
         return reports.list_answer(self.reports.find(state.executive_id))
+
+    def _cmd_undo(self, state: SessionState, _args: str) -> Answer:
+        """Restores the last delete batch of the Executive in the Undo window (A8, AC-R3.3). No LLM."""
+        now = self.clock()
+        batch = self.reports.last_batch(state.executive_id)
+        with self.tracer.span("undo") as span:
+            if batch is None or batch.restored:
+                span.set("state", "nothing")
+                notice = Notice(level="info", title="There is no delete to undo", body="Nothing was restored.")
+                return Answer(kind="notice", blocks=[notice])
+            span.set("batch_id", batch.batch_id)
+            if now > batch.undo_until:
+                span.set("state", "window_ended")
+                notice = Notice(level="info", title="The Undo window has ended", body="Nothing was restored.")
+                return Answer(kind="notice", blocks=[notice])
+            restored = self.reports.restore(batch.batch_id, state.executive_id)
+            trace_id = self.tracer.current_trace_id()
+            self.reports.audit(AuditEntry(state.executive_id, "undo", batch.batch_id, tuple(restored), trace_id, now))
+            span.set("state", "restored")
+            span.set("count", len(restored))
+        return Answer(kind="answer", blocks=[Result(action="restored", count=len(restored))])
 
     def _cmd_scope(self, state: SessionState, _args: str) -> Answer:
         entry = self.config.access(state.executive_id)

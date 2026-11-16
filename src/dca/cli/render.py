@@ -78,6 +78,7 @@ COMMANDS = [
     ("/sql", "Show the SQL of the last Answer."),
     ("/save [title]", "Save the last Answer as a Saved Report."),
     ("/list", "List your Saved Reports."),
+    ("/undo", "Restore the reports of the last delete."),
     ("/exit", "End the session."),
 ]
 
