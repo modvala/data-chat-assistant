@@ -217,8 +217,8 @@ Each of the four required features (P1) has automated tests. Examples:
 
 ### P19. The project runs on a different machine
 
-- uv is the main dependency manager, because the customer prefers it. Use `pyproject.toml` and `uv.lock`. Install with `uv sync`.
-- Generate `requirements.txt` as a fallback for `pip`, because the assignment mentions `pip`.
+- uv is the only dependency manager, because the customer prefers it. Use `pyproject.toml` and `uv.lock`. Install with `uv sync`.
+- There is no `requirements.txt` for `pip`. The assignment mentions `pip`, but on 2026-11-16 the Project client confirmed that uv is sufficient.
 - Supply `.env.example`, step-by-step instructions and an example run.
 - Do not hardcode dates. The data is synthetic and it changes.
 

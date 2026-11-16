@@ -51,16 +51,6 @@ flowchart LR
    uv run chat --executive mgr_ana
    ```
 
-**Without uv.** `requirements.txt` is made from `uv.lock`. It installs the project with pip:
-
-```bash
-python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
-```
-
-```bash
-.venv/bin/chat --executive mgr_ana
-```
-
 ## Use
 
 `executives.json` is the access mapping of the prototype. There is no sign-in: `--executive` selects the Executive.
