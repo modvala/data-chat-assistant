@@ -27,7 +27,9 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
     with turn.tracer.span("tool.run_query", attempt=len(turn.attempts)):
         turn.progress("dry_run", {})
         with turn.tracer.span("guard.sql") as span:
-            verdict = sql_guard.check(sql, grant, source_dataset=settings.warehouse.source_dataset)
+            verdict = sql_guard.check(
+                sql, grant, source_dataset=settings.warehouse.source_dataset, sql_limit=settings.limits.sql_limit
+            )
             span.set("decision", "allowed" if isinstance(verdict, sql_guard.Allowed) else "blocked")
             if isinstance(verdict, sql_guard.Blocked):
                 span.set("reason", verdict.reason)
@@ -49,6 +51,10 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
                 span.set("error", str(error))
                 return {"error": f"The query failed in the dry run. Fix it. Detail: {error}"}
             span.set("bytes", estimate)
+            if estimate > settings.budget.query_bytes:
+                span.set("over_limit", True)
+                attempt.error = "budget"
+                raise TurnStop("budget", "query bytes")
 
         turn.progress("query", {})
         query_id = turn.next_query_id()

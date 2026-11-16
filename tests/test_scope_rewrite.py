@@ -31,7 +31,7 @@ QUERIES = [
 
 
 def allowed(sql: str, grant: Grant = MANAGER) -> sql_guard.Allowed:
-    verdict = sql_guard.check(sql, grant, source_dataset=DATASET)
+    verdict = sql_guard.check(sql, grant, source_dataset=DATASET, sql_limit=50)
     assert isinstance(verdict, sql_guard.Allowed), verdict
     return verdict
 
