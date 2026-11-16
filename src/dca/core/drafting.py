@@ -117,6 +117,11 @@ def answer_from_draft(text: str, turn: TurnContext, *, model: str, fallback_used
         reason = output_guard.check(blocks + [Text(markdown=item) for item in assumptions])
         span.set("decision", "blocked" if reason else "allowed")
         span.set("reason", reason)
+        if not reason:
+            # V20: the trace keeps the first rows of each table, only after the Output guard passed them.
+            for block in blocks:
+                if isinstance(block, Table):
+                    span.set(f"rows.{block.query_id}", block.rows[: turn.settings.limits.trace_rows])
     if reason:
         return Answer(
             kind="notice",

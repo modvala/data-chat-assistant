@@ -32,6 +32,7 @@ from dca.core.answer import (
     SqlView,
     Table,
     Text,
+    TraceView,
 )
 
 THEME = Theme(
@@ -79,6 +80,7 @@ COMMANDS = [
     ("/save [title]", "Save the last Answer as a Saved Report."),
     ("/list", "List your Saved Reports."),
     ("/undo", "Restore the reports of the last delete."),
+    ("/trace [id]", "Show the steps of a Turn. With no ID: the last Turn."),
     ("/exit", "End the session."),
 ]
 
@@ -191,7 +193,9 @@ class Renderer:
         for block in answer.blocks:
             if isinstance(block, SqlView):
                 self.sql_view(block)
-        if any(isinstance(block, SqlView) for block in answer.blocks):
+            elif isinstance(block, TraceView):
+                self.trace_view(block)
+        if any(isinstance(block, SqlView | TraceView) for block in answer.blocks):
             return
         for block in answer.blocks:
             if isinstance(block, Confirmation):
@@ -205,7 +209,7 @@ class Renderer:
                 break
             leading.append(block)
         for block in leading:
-            self.notice(block)
+            self.notice(block, answer.provenance.trace_id)
         rest = answer.blocks[len(leading) :]
         notices = [block for block in rest if isinstance(block, Notice | Refusal)]
         content = [block for block in rest if not isinstance(block, Notice | Refusal | Confirmation | Result)]
@@ -215,7 +219,7 @@ class Renderer:
             if isinstance(block, Refusal):
                 self.refusal(block, answer.provenance.trace_id)
             else:
-                self.notice(block)
+                self.notice(block, answer.provenance.trace_id)
         scoped = answer.provenance.brand_scope or answer.provenance.all_brands
         if content and answer.kind == "answer" and answer.provenance.trace_id and scoped:
             self.provenance(answer.provenance, report=answer.report)
@@ -398,14 +402,30 @@ class Renderer:
         line.append(text, style="dca.text")
         self.out(line)
 
+    # C15
+    def trace_view(self, view: TraceView) -> None:
+        sep = self.sym("sep")
+        status = {"ok": "ok", "error": "error", "refusal": "refusal", "info": "agent"}
+        styles = {"ok": "dca.success", "error": "dca.danger", "refusal": "dca.refusal", "info": "dca.muted"}
+        started = view.started.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        self.out(RichText(f"trace {view.trace_id[:8]} {sep} {started} {sep} {view.duration_ms / 1000:.1f} s {sep} {view.outcome}"))
+        width = max((len(row.label) for row in view.rows), default=0)
+        for index, row in enumerate(view.rows):
+            branch = ("`-" if self.mode.ascii else "└─") if index == len(view.rows) - 1 else ("|-" if self.mode.ascii else "├─")
+            duration = f"{row.duration_ms:,.0f} ms" if row.duration_ms < 1000 else f"{row.duration_ms / 1000:.1f} s"
+            line = RichText(f"{branch} {row.label:<{width}}  ")
+            line.append(f"{self.sym(status[row.status])} ", style=styles[row.status])
+            line.append(f"{row.detail:<38} {duration:>8}")
+            self.out(line)
+
     # C11
-    def notice(self, notice: Notice) -> None:
+    def notice(self, notice: Notice, trace_id: str = "") -> None:
         style, symbol = NOTICE_STYLE[notice.level]
         lines = [f"{self.sym(symbol)} {notice.title}"]
         if notice.body:
             lines.append(notice.body)
-        if notice.trace_id:
-            lines.append(f"trace {notice.trace_id[:8]}")
+        if notice.trace_id or trace_id:
+            lines.append(f"trace {(notice.trace_id or trace_id)[:8]}")
         self._bar(lines, style)
 
     def refusal(self, refusal: Refusal, trace_id: str) -> None:
