@@ -3,3 +3,6 @@
 .venv/
 __pycache__/
 PROTOTYPE_wipe_me_*
+dca_traces.jsonl
+dca_reports.sqlite
+.pytest_cache/
