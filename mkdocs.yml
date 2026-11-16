@@ -1,0 +1,47 @@
+site_name: Data Chat Assistant
+site_description: A chat agent that lets the Executives of a retail company ask questions about their sales data.
+site_url: https://modvala.github.io/data-chat-assistant/
+repo_url: https://github.com/modvala/data-chat-assistant
+repo_name: modvala/data-chat-assistant
+
+# The site publishes only the simple docs (P24). The detailed docs stay on github.com.
+docs_dir: docs/site
+use_directory_urls: true
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: date
+      # A new page has no git log before its first commit. Log this as info, not as a warning.
+      strict: false
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true

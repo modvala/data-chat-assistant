@@ -1,0 +1,69 @@
+# Builds the simple docs in docs/site/ and publishes them to GitHub Pages (P24).
+# A pull request only checks the build. A push to main and a manual run also deploy.
+name: Docs site
+
+on:
+  pull_request:
+    paths:
+      - "docs/site/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/site/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The git-revision-date-localized plugin reads the date of each page from the git history.
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Build the site
+        run: uv run --locked --only-group docs mkdocs build --strict
+        env:
+          # Hide the end-of-life notice of Material for MkDocs in the build log.
+          NO_MKDOCS_2_WARNING: "1"
+
+      # A pull request only checks the build. The other events upload the site for the deploy job.
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

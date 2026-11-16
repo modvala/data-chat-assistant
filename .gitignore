@@ -5,3 +5,6 @@ __pycache__/
 PROTOTYPE_wipe_me_*
 data/
 .pytest_cache/
+
+# MkDocs build output
+/site/

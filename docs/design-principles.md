@@ -224,9 +224,11 @@ Each of the four required features (P1) has automated tests. Examples:
 
 ### P24. The documentation has one source
 
-- `docs/` is the single source of the documentation. A GitHub Action publishes it to GitHub Pages.
-- Each page must also read correctly on github.com, because a reviewer may not open the Pages site.
-- Do not copy content between the README, the docs and the site. Use links.
+- `docs/` holds all documentation. The detailed docs are for engineers and agents. They are read on github.com.
+- `docs/site/` holds the simple docs for quick readers and Executives. A GitHub Action publishes only `docs/site/` to GitHub Pages.
+- The `sync-simple-docs` skill writes `docs/site/`. The overview and Key decisions are derived. They own no numbers, values or rules, and they agree with the HLD and the ADRs. Get started and the Executive guide own the install steps and the CLI commands.
+- Each page must read correctly on github.com.
+- Do not copy content between the README, the detailed docs and the simple docs. Use links.
 
 ### P25. Each requirement is traceable
 
