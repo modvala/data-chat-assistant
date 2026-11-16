@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from dca.config import Settings
-from dca.core import context, drafting, messages
-from dca.core.answer import Answer, Bullets, Notice, Provenance, Text
-from dca.core.ports import ConfigStore, Grant, KnowledgeStore, Role, SessionStore, Tracer, Warehouse
+from dca.core import context, drafting, input_guard, messages
+from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Text
+from dca.core.ports import ConfigStore, Grant, KnowledgeStore, LLMClient, Role, SessionStore, Tracer, Warehouse
 from dca.core.state import QueryHandle, SessionState, TurnRecord
 from dca.core.demographic import THRESHOLD_VIEW
 from dca.core.turn import ThresholdState, TurnContext, TurnStop
@@ -79,6 +79,7 @@ class TurnAPI:
         warehouse: Warehouse,
         tracer: Tracer,
         knowledge: KnowledgeStore,
+        llm: LLMClient,
         agent_loop: Any,
     ) -> None:
         self.settings = settings
@@ -87,6 +88,7 @@ class TurnAPI:
         self.warehouse = warehouse
         self.tracer = tracer
         self.knowledge = knowledge
+        self.llm = llm
         self.agent_loop = agent_loop
         self.access = AccessResolver(config_store, warehouse, settings)
         project, dataset = settings.google_cloud_project, settings.warehouse.threshold_dataset
@@ -127,7 +129,14 @@ class TurnAPI:
                     threshold=self.threshold,
                 )
                 progress("thinking", {})
-                answer, outcome = self._agent_turn(turn, text)
+                decision = self._input_guard(text)
+                if decision.blocked:
+                    answer = self._refusal(turn, TurnStop("not_analysis", decision.reason))
+                    outcome = "refused"
+                elif decision.intent == "schema_question":
+                    answer, outcome = self._schema_answer(turn), "answered"
+                else:
+                    answer, outcome = self._agent_turn(turn, text)
             except Exception as error:  # noqa: BLE001 - the Turn error handler (P15)
                 self.tracer.log("turn.error", error=type(error).__name__)
                 answer = Answer(
@@ -154,6 +163,46 @@ class TurnAPI:
             return answer
 
     # --- Turn parts
+
+    def _input_guard(self, text: str) -> input_guard.InputDecision:
+        with self.tracer.span("guard.input") as span:
+            reason = input_guard.check_rules(text, self.settings.limits.input_max_chars)
+            if reason is not None:
+                decision = input_guard.InputDecision("other", reason)
+            else:
+                try:
+                    intent, tokens = input_guard.classify(self.llm, text, model=self.settings.fallback_model)
+                    span.set("tokens", tokens)
+                    decision = input_guard.InputDecision(intent, "intent" if intent == "other" else "")
+                except Exception as error:  # noqa: BLE001 - the classifier is only the first filter
+                    span.set("error", type(error).__name__)
+                    decision = input_guard.InputDecision("analysis", "classifier_unavailable")
+            span.set("intent", decision.intent)
+            span.set("decision", "blocked" if decision.blocked else "allowed")
+            span.set("reason", decision.reason)
+        return decision
+
+    def _schema_answer(self, turn: TurnContext) -> Answer:
+        """A schema question gets an Answer from the schema description, with no query."""
+        blocks: list = [
+            Heading(source="code", text="The data you can analyze"),
+            Text(
+                source="code",
+                markdown="You can ask about the sales, orders and Customers of your brands. "
+                "Customers show only by ID, with no names or contact data.",
+            ),
+            Text(source="code", markdown=self.knowledge.schema()),
+            Bullets(
+                source="code",
+                items=[
+                    "What was the revenue by month this year?",
+                    "Who are the top 10 Customers by total spend?",
+                    "Compare the revenue of two brands, and tell me why they differ.",
+                    "Create a report for Q1 with insights and action items for Q2.",
+                ],
+            ),
+        ]
+        return Answer(kind="answer", blocks=blocks, provenance=drafting.provenance(turn, model=""))
 
     def _agent_turn(self, turn: TurnContext, text: str) -> tuple[Answer, str]:
         instruction = context.instruction(turn, self.knowledge.schema())

@@ -83,6 +83,7 @@ def make_api(settings: Settings, warehouse: FakeWarehouse) -> Callable[..., Turn
             warehouse=warehouse_ or warehouse,
             tracer=JsonlTracer(Path(used.paths.trace_file)),
             knowledge=knowledge,
+            llm=llm,
             agent_loop=AdkAgentLoop(llm.adk_model, knowledge),
         )
 
