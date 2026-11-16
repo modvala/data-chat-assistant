@@ -35,13 +35,14 @@ There are two kinds of page:
 ### Facts
 
 - A derived page has no numbers, values or rules that a detailed doc owns: no thresholds, limits, budgets, retry counts, model IDs, time windows or brand names. Say what happens, and link to the detail. The one exception is a count that you compute from the rows of the coverage table, such as the status table on Home.
-- Each `##` or `###` section of a derived page that summarizes a detailed doc ends with a **Details** line. When a section has subsections, only the subsections have one. The page intro and navigation sections, such as "Start here", have none, unless PAGES.md says otherwise. The Details line has one or more full github.com links to the source sections on `main`:
+- Each `##` or `###` section of a derived page that summarizes a detailed doc ends with a **Details** line. When a section has subsections, only the subsections have one. The page intro and navigation sections, such as "Start here", have none, unless PAGES.md says otherwise. A section of a source page that summarizes a detailed doc also ends with a Details line. The Details line has one or more full github.com links to the source sections on `main`:
   `**Details:** [HLD §10 Destructive operations](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations)`
   A GitHub anchor is the heading in lower case, with spaces changed to `-` and other punctuation removed: `### 8.1 Layers` → `#81-layers`. A punctuation mark between two spaces (`Safety & PII`) gives `--` on GitHub but `-` on the site.
-- Links between pages in `docs/site/` are relative (`how-it-works.md`). If the target page does not exist yet, link to its current source on github.com: `docs/demo.md` for the Demo tour, `README.md#setup` for Get started and `README.md#use` for the Executive guide.
+- Links between pages in `docs/site/` are relative (`how-it-works.md`).
 - In a heading of a site page, write `and`, not `&`, and put no other punctuation mark between two spaces. Then the anchor is the same on the site and on github.com.
 - Each statement agrees with its source. When two sources do not agree, write what the HLD and the ADRs say, and report the disagreement (step 6).
-- When the design shows a part that has no code on `main`, give it the label of its AC from the coverage table, or **Production design** if it has no AC. When the part has more than one AC, use the label of the AC that is about the prototype (Must or Bonus). Do not describe it as a part of the prototype.
+- On a source page, the code wins over `cli.md`, because the page owns the commands. Values that the CLI prints, or that a command needs, are permitted on a source page.
+- When the design shows a part that has no code on `main`, give it the label of its AC from the coverage table, or **Production design** if it has no AC. When the part has more than one AC, use the label of the AC that is about the prototype (Must or Bonus). A part of the CLI design with no code and no AC, such as charts, gets no label: say that the prototype does not have it. Do not describe it as a part of the prototype.
 
 ### Labels
 
@@ -57,13 +58,15 @@ Each acceptance criterion (AC) has one label. Take it from the "Mark" column of 
 
 - An example input is one shell command, one question or one CLI command in its own `bash` or `text` code block. Material adds a copy button to each block.
 - An example output is in a `text` block. It shows the **shape** of the Answer, with no figures from the data. The data is synthetic and it changes (P19).
-- Each example must run on the CLI on `main`. If you cannot run it, say so in the report.
+- Number the inputs of one Demo tour scenario (1, 2, 3), and use the same numbers in "What you see". A key press, such as `Ctrl+C`, or another reply to the same prompt can be in the text.
+- Each example must run on the CLI on `main`. An input counts as tested when it ran on the CLI, or when it is the same input as a tested Demo tour scenario. If you cannot run it, say so on the status line and in the report.
 
 ### Layout
 
 Each page must read correctly on the site and on github.com (P24). So use only these constructs:
 
 - Markdown headings, lists, tables, links and `text`, `bash` and `mermaid` code blocks.
+- In a numbered list, indent a code block with 4 spaces.
 - Cards: an HTML block `<div class="grid cards" markdown>`, a blank line, a Markdown list, a blank line, `</div>`.
 - A note: a Markdown blockquote (`>`).
 - Two variants, such as the prototype and production: two headed sections, one after the other.

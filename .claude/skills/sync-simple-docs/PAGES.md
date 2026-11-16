@@ -26,7 +26,8 @@ Use this map in step 1 to find the pages that a changed file affects.
 | `docs/tech-stack.md` | How it works |
 | `pyproject.toml`, `.env.example`, `scripts/*`, `executives.json` | Get started, Executive guide |
 | `src/dca/cli/*` | Executive guide, Demo tour, Get started |
-| `src/dca/setup_bq.py` | Get started |
+| `src/dca/setup_bq.py`, `compose.yaml`, `docker/*`, `config/defaults.toml`, `tests/test_live.py` | Get started |
+| `src/dca/core/messages.py`, `src/dca/app/turn_api.py` | Executive guide, Demo tour |
 
 ## Home (`index.md`)
 
@@ -105,28 +106,29 @@ The page intro has one Details link to HLD §24, and a short "Words on this page
 
 ## Get started (`get-started.md`)
 
-**Reader:** a reviewer or an engineer who runs the prototype. An Executive does not install anything. **Sources:** `pyproject.toml`, `.env.example`, `scripts/setup-gcp.sh`, `src/dca/setup_bq.py`, the `--help` output of the commands. Page type: a quick start.
+**Reader:** a reviewer or an engineer who runs the prototype. An Executive does not install anything. **Sources:** `pyproject.toml`, `.env.example`, `scripts/setup-gcp.sh`, `src/dca/setup_bq.py`, `compose.yaml`, `docker/*`, `config/defaults.toml`, `tests/test_live.py`, the `--help` output of the commands. Page type: a quick start.
 
 **Out:** the design, and the reasons for the tools. Link to How it works and Key decisions.
 
-Outline, in this order: prerequisites; install with `uv sync`; configure `.env`; the GCP setup script and ADC impersonation of `dca-agent`; `uv run setup-bq`; the first chat; the offline and `live` tests; configuration reference; a troubleshooting table with the usual errors.
+Outline, in this order: prerequisites; install with `uv sync` (uv is the only dependency manager, P19); configure `.env`; the GCP setup script and ADC impersonation of `dca-agent`; `uv run setup-bq`; the first chat; run with Docker, as a second way; the offline and `live` tests and the metrics command; configuration reference; a troubleshooting table with the usual errors.
 
 - Each step has one line that says **why** it is necessary.
 - Each command is in its own `bash` block.
 
 ## Demo tour (`demo-tour.md`)
 
-**Reader:** reviewers. **Sources:** the Must ACs of `docs/requirements-coverage.md`, the CLI.
+**Reader:** reviewers. **Sources:** the Must ACs of `docs/requirements-coverage.md`, the CLI, `src/dca/core/messages.py`, `src/dca/app/turn_api.py`.
 
 **Out:** the setup steps (link to Get started) and the design of each feature (link to Requirements).
 
 - One scenario for each Must AC, with the headings `## D<n>. <name> (AC-<id>)`. Keep the headings, because the coverage table and the Requirements page link to their anchors.
 - Each scenario has: the AC in plain words, the inputs (one input in each code block, numbered), and "What you see" with the same numbers.
 - A scenario for a Bonus AC is added only when its code exists.
+- Each scenario can run after the scenarios before it. When a scenario needs the state of an earlier one, such as the Saved Reports of D5, say so at its start.
 
 ## Executive guide (`guide.md`)
 
-**Reader:** Executives. **Sources:** `docs/design/cli.md`, the `/help` output, `executives.json`.
+**Reader:** Executives. **Sources:** `docs/design/cli.md`, the `/help` output (`src/dca/cli/render.py`), `src/dca/core/messages.py` (refusal and notice texts), `src/dca/app/turn_api.py`, `executives.json`.
 
 **Out:** the setup steps, the design and the internal names of the CLI components (C1–C17).
 

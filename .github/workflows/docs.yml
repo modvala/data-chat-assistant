@@ -23,6 +23,12 @@ on:
       - "scripts/**"
       - "src/dca/cli/**"
       - "src/dca/setup_bq.py"
+      - "src/dca/core/messages.py"
+      - "src/dca/app/turn_api.py"
+      - "compose.yaml"
+      - "docker/**"
+      - "config/defaults.toml"
+      - "tests/test_live.py"
   push:
     branches: [main]
     paths:
@@ -52,7 +58,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
-          sources=$(printf '%s\n' "$changed" | grep -E '^(docs/design/|docs/adr/|docs/requirements/|docs/requirements-coverage\.md$|docs/tech-stack\.md$|pyproject\.toml$|\.env\.example$|executives\.json$|scripts/|src/dca/cli/|src/dca/setup_bq\.py$)' || true)
+          sources=$(printf '%s\n' "$changed" | grep -E '^(docs/design/|docs/adr/|docs/requirements/|docs/requirements-coverage\.md$|docs/tech-stack\.md$|pyproject\.toml$|\.env\.example$|executives\.json$|scripts/|src/dca/cli/|src/dca/setup_bq\.py$|src/dca/core/messages\.py$|src/dca/app/turn_api\.py$|compose\.yaml$|docker/|config/defaults\.toml$|tests/test_live\.py$)' || true)
           site=$(printf '%s\n' "$changed" | grep -E '^docs/site/' || true)
           if [ -n "$sources" ] && [ -z "$site" ]; then
             echo "::warning title=Simple docs not synced::This PR changes sources of docs/site/ but not docs/site/. Run the sync-simple-docs skill. Changed sources: $(echo $sources)"

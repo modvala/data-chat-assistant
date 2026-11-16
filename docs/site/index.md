@@ -55,7 +55,7 @@ Each requirement has acceptance criteria: the checks that show that the requirem
 | Label | Core chat and R1–R8 | Extras |
 | --- | --- | --- |
 | **Works in the prototype** | 13 | 0 |
-| **Planned extra** | 5 | 1 |
+| **Planned extra** | 5 | 2 |
 | **Production design** | 7 | 2 |
 
 The [Requirements](requirements.md) page gives each acceptance criterion and its label.
@@ -65,5 +65,5 @@ The [Requirements](requirements.md) page gives each acceptance criterion and its
 ## Start here
 
 - **Reviewer:** read [How it works](how-it-works.md).
-- **Engineer:** install and run the prototype with the [setup steps](https://github.com/modvala/data-chat-assistant/blob/main/README.md#setup).
-- **Executive:** learn the chat commands in the [README](https://github.com/modvala/data-chat-assistant/blob/main/README.md#use).
+- **Engineer:** install and run the prototype with the [setup steps](get-started.md).
+- **Executive:** learn how to ask and read Answers in the [Executive guide](guide.md).
