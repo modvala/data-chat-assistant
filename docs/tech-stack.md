@@ -7,12 +7,13 @@ This page lists the selected tools and services. The reasons for the decisions t
 | Part | Selection |
 | --- | --- |
 | Language and dependencies | Python 3.12, uv with `pyproject.toml` and `uv.lock`, `requirements.txt` as a fallback (P19) |
-| Agent framework | Google ADK, after a spike, with a plain `google-genai` loop as the fallback ([ADR 0003](adr/0003-google-adk-framework.md)) |
+| Agent framework | Google ADK 2.x; the spike passed ([ADR 0003](adr/0003-google-adk-framework.md)) |
 | LLM | `gemini-3.8-flash` as the main model, `gemini-3.5-flash-lite` as the fallback, from the Gemini API free tier. The model IDs and rate limits are in the configuration (P17). |
 | Embeddings | `gemini-embedding-2`, with an in-memory cosine search (numpy) over the Trios |
 | CLI | Typer and Rich |
 | SQL validation and rewrite | sqlglot, BigQuery dialect |
 | Warehouse | BigQuery, `bigquery-public-data.thelook_ecommerce`. The BigQuery sandbox is sufficient. |
+| GCP identity | The service account `dca-agent` with `bigquery.jobUser` on the project and read access to the `dca_views` dataset. Local runs impersonate it, so there is no key file. `scripts/setup-gcp.sh` makes it. |
 | Local stores | SQLite for Saved Reports and the audit log; YAML for the Executive profiles, `persona.yaml` and `executives.json` |
 | Configuration models | Pydantic |
 | Tracing | OpenTelemetry SDK with a JSONL exporter. `/trace` reads the JSONL file. |

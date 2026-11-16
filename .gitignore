@@ -1,1 +1,5 @@
 .DS_Store
+.env
+.venv/
+__pycache__/
+PROTOTYPE_wipe_me_*

@@ -13,6 +13,22 @@ Before we commit to ADK, a time-boxed spike of 1–2 hours must pass these check
 
 If checks 1–3 fail, the adapter changes to a plain `google-genai` loop. The core does not change.
 
+## Spike result
+
+On 2026-11-16, all four checks passed with `google-adk` 2.14.1 and `gemini-3.5-flash`. Thus we use ADK. The spike code is on the branch [`prototype/adk-spike`](https://github.com/modvala/data-chat-assistant/tree/prototype/adk-spike) and is not in `main`.
+
+| Check | Result |
+| --- | --- |
+| 1. PII block | The callback calls a plain Python guard with no ADK imports, and returns an error dict. The tool body does not run. |
+| 2. Brand scope in the session | The tool reads the scope from `tool_context.state`. A second `Runner` on the same session service gets the same state and the state that the tool wrote. This is the shape of P21. |
+| 3. JSONL trace | ADK uses the global OpenTelemetry tracer provider. Each Turn is one trace. Our `guard.sql` span is in the same trace as the ADK spans. By default, ADK writes no prompt text, answer text or tool arguments to the span attributes (P9). |
+| 4. Threshold view | Passed. The details are in ADR 0005. |
+
+What the spike also showed:
+
+- On the free tier, `gemini-3.8-flash` often returned 503 "high demand", and `gemini-3.5-flash-lite` sometimes did too. The default retry of `google-genai` hid a 503 for minutes. Set `retry_options` on the ADK `Gemini` model to bound the retries (P15).
+- After the retries, a 503 stops the whole ADK run. ADK does not change to a different model. Our Turn error handler must catch the error and run the Turn again with the fallback model (P15).
+
 ## Considered options
 
 - **LangGraph**: closest to our experience, but weaker GCP story.
