@@ -67,6 +67,9 @@ class TurnModel(BaseLlm):
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
         turn: TurnContext = self.turn
+        turn.check_cancel()
+        if turn.budget:
+            turn.budget.before_llm_call()
         turn.progress("writing" if turn.queries else "sql", {})
         timeout_s = turn.settings.timeout.llm_call_s
         # V9: an LLM call stops after its timeout. The HTTP timeout closes the socket, and the
@@ -105,6 +108,8 @@ class TurnModel(BaseLlm):
                 yield response
             span.set("tokens_in", tokens_in)
             span.set("tokens_out", tokens_out)
+            if turn.budget:
+                turn.budget.add_tokens(tokens_in + tokens_out)
             span.set("latency_ms", round((time.monotonic() - started) * 1000))
 
 

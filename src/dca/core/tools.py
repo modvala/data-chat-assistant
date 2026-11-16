@@ -17,9 +17,9 @@ from typing import Any, TypeVar
 
 from dca.core import backoff, confirmation, demographic, diagnostic, reports, sql_guard
 from dca.core.answer import Answer, Notice
-from dca.core.ports import Grant, KnowledgeStore, WarehouseError, WarehouseTransientError
+from dca.core.ports import Grant, KnowledgeStore, WarehouseCancelled, WarehouseError, WarehouseTransientError
 from dca.core.state import SqlAttempt
-from dca.core.turn import QueryRun, TurnContext, TurnFinish, TurnStop
+from dca.core.turn import QueryRun, TurnCancelled, TurnContext, TurnFinish, TurnStop
 
 
 T = TypeVar("T")
@@ -117,12 +117,13 @@ def _fail(turn: TurnContext, attempt: SqlAttempt, error: str, llm_text: str) -> 
             trace_id=turn.trace_id,
         )
         turn.tracer.log("sql.corrections_used", attempts=len(turn.attempts))
-        raise TurnFinish(Answer(kind="notice", blocks=[notice]), "failed")
+        raise TurnFinish(Answer(kind="notice", blocks=[notice]), "failed", stop_limit="corrections")
     return {"error": llm_text}
 
 
 def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
     settings = turn.settings
+    turn.check_cancel()
     failures = failed_attempts(turn)
     attempt = SqlAttempt(sql=sql)
     turn.attempts.append(attempt)
@@ -151,9 +152,12 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
                         continue
                     return _fail(turn, attempt, str(error), f"The query failed in the dry run. Fix it. Detail: {error}")
                 span.set("bytes", estimate)
-                if estimate > settings.budget.query_bytes:
-                    span.set("over_limit", True)
-                    raise TurnStop("budget", "query bytes")
+                if turn.budget:
+                    try:
+                        turn.budget.before_query(estimate)
+                    except TurnStop:
+                        span.set("over_limit", True)
+                        raise
             break
 
         turn.progress("query", {})
@@ -174,6 +178,13 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
             except WarehouseError as error:
                 span.set("error", str(error))
                 return _fail(turn, attempt, str(error), f"The query failed. Fix it. Detail: {error}")
+            except WarehouseCancelled:
+                span.set("cancelled", True)
+                raise TurnCancelled() from None
+            finally:
+                turn.running_job = None
+            if turn.budget:
+                turn.budget.add_bytes(result.bytes_processed)
             rows = [[jsonable(value) for value in row] for row in result.rows]
             span.set("bytes", result.bytes_processed)
             span.set("rows", len(rows))
@@ -204,7 +215,10 @@ def _with_retry(turn: TurnContext, call: Callable[[str], T], job_id: str) -> T:
     retry = turn.settings.retry
     for attempt in range(retry.bq_retries + 1):
         try:
-            return call(f"{job_id}-r{attempt}" if job_id and attempt else job_id)
+            turn.check_cancel()
+            current = f"{job_id}-r{attempt}" if job_id and attempt else job_id
+            turn.running_job = current or None
+            return call(current)
         except WarehouseTransientError as error:
             if error.job_id:
                 turn.warehouse.cancel(error.job_id)

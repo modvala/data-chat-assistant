@@ -3,6 +3,7 @@
 import asyncio
 import json
 import re
+import threading
 from collections.abc import AsyncGenerator, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -11,7 +12,14 @@ from google.adk.models import BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
 from pydantic import ConfigDict
 
-from dca.core.ports import LLMResult, LLMTransientError, QueryResult, WarehouseError, WarehouseTransientError
+from dca.core.ports import (
+    LLMResult,
+    LLMTransientError,
+    QueryResult,
+    WarehouseCancelled,
+    WarehouseError,
+    WarehouseTransientError,
+)
 
 ALL_BRANDS = ["Allegra K", "Calvin Klein", "Carhartt", "Columbia", "Levi's", "Nike", "Quiksilver", "Volcom"]
 
@@ -129,6 +137,7 @@ class Rule:
     dry_error: str | None = None
     raise_error: BaseException | None = None
     transient: bool = False  # a timeout of the job: WarehouseTransientError with the job ID
+    block: bool = False  # the job runs until cancel(job_id), then raises WarehouseCancelled
     times: int | None = None
 
 
@@ -150,6 +159,8 @@ class FakeWarehouse:
     dry_runs: list[Call] = field(default_factory=list)
     cancels: list[str] = field(default_factory=list)
     date_range: tuple[str, str] = ("2019-01-06", "2026-10-15")
+    job_started: threading.Event = field(default_factory=threading.Event)
+    job_cancelled: threading.Event = field(default_factory=threading.Event)
 
     def on(
         self,
@@ -194,9 +205,15 @@ class FakeWarehouse:
             raise rule.raise_error
         if rule.transient:
             raise WarehouseTransientError("timeout", job_id=job_id)
+        if rule.block:
+            self.job_started.set()
+            if not self.job_cancelled.wait(timeout=10):
+                raise AssertionError("the blocked job was not cancelled")
+            raise WarehouseCancelled()
         if rule.error:
             raise WarehouseError(rule.error)
         return QueryResult(job_id, list(rule.columns), [list(r) for r in rule.rows], rule.bytes)
 
     def cancel(self, job_id: str) -> None:
         self.cancels.append(job_id)
+        self.job_cancelled.set()
