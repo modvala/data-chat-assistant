@@ -98,3 +98,4 @@ flowchart TB
 | EX.1 | A result cache keyed by a hash of the normalized SQL | Bonus |
 | EX.3 | A circuit breaker for each external service | Design |
 | EX.4 | Production observability: Cloud Trace, Logging and Monitoring, and a log sink to BigQuery | Design |
+| EX.5 | A Docker setup, so that a host with only Docker can run the prototype (deliverable 5: "runnable on another machine"). [`docker/Dockerfile`](../docker/Dockerfile), [`compose.yaml`](../compose.yaml), [`test_docker_setup.py`](../tests/test_docker_setup.py), [README](../README.md#run-with-docker) | Bonus |

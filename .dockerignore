@@ -1,0 +1,16 @@
+# Secrets, local state, caches and files that the CLI does not read stay out of the image (#40).
+.env*
+!.env.example
+.venv
+data
+site
+.git
+.github
+.claude
+docs
+tests
+prototypes
+mkdocs.yml
+**/.DS_Store
+**/__pycache__
+.pytest_cache

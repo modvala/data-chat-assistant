@@ -1,0 +1,29 @@
+# The Docker setup for a reviewer (#40). Each command: docker compose run --rm dca <command>.
+# The README section "Run with Docker" gives the steps.
+services:
+  dca:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: data-chat-assistant
+    env_file:
+      - .env
+    stdin_open: true
+    tty: true
+    volumes:
+      # The Saved Reports and the traces stay on the host after --rm.
+      - type: bind
+        source: ./data
+        target: /app/data
+      # A change to the access mapping needs no new image (P17).
+      - type: bind
+        source: ./executives.json
+        target: /app/executives.json
+        read_only: true
+      # The credentials of gcloud and of ADC. They never go into the repository.
+      - type: volume
+        source: gcloud-config
+        target: /home/dca/.config/gcloud
+
+volumes:
+  gcloud-config:

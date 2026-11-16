@@ -53,6 +53,77 @@ flowchart LR
    uv run chat --executive mgr_ana
    ```
 
+## Run with Docker
+
+This is a second way to run the prototype. The host needs only Docker with the Compose plugin. The image contains Python, the app and the Google Cloud CLI (about 1.7 GB). The steps are the same as in [Setup](#setup), but each command starts with `docker compose run --rm dca`.
+
+```mermaid
+flowchart LR
+    subgraph Host
+        ENV[".env"]
+        DATA["data/<br/>Saved Reports, traces"]
+        EX["executives.json<br/>(read-only)"]
+    end
+    VOL[("volume gcloud-config<br/>gcloud and ADC credentials")]
+    C["Container dca<br/>app + gcloud + bq"]
+    ENV -->|env_file| C
+    DATA <--> C
+    EX --> C
+    VOL <--> C
+```
+
+1. Copy the example settings, then put your API key and your project ID in `.env`. Make the data folder:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   ```bash
+   mkdir -p data
+   ```
+
+2. Build the image:
+
+   ```bash
+   docker compose build
+   ```
+
+3. Log in with your `gcloud` account. The container has no browser: open the URL on your host, then paste the code into the terminal.
+
+   ```bash
+   docker compose run --rm dca gcloud auth login --no-launch-browser
+   ```
+
+4. Make the GCP resources. The script uses `GOOGLE_CLOUD_PROJECT` from `.env`:
+
+   ```bash
+   docker compose run --rm dca scripts/setup-gcp.sh
+   ```
+
+5. Let ADC impersonate `dca-agent`:
+
+   ```bash
+   docker compose run --rm dca gcloud auth application-default login --no-launch-browser --impersonate-service-account=dca-agent@<your-project-id>.iam.gserviceaccount.com
+   ```
+
+6. Make the threshold views:
+
+   ```bash
+   docker compose run --rm dca setup-bq
+   ```
+
+7. Start the chat:
+
+   ```bash
+   docker compose run --rm dca chat --executive mgr_ana
+   ```
+
+- The Saved Reports and the traces stay in `data/` on the host. The metrics command also runs in the container: `docker compose run --rm dca dca-metrics data/dca_traces.jsonl`.
+- A change to `.env` or to `executives.json` needs no new image. A change to the code or to `config/defaults.toml` needs `docker compose build`.
+- For a pipe (for example with `--plain`), add `-T` after `run`, so that the container gets no terminal: `docker compose run --rm -T dca chat ...`.
+- The container runs as the user with UID 1000. On a Linux host, this user must be able to write to `data/`.
+- To remove the credentials, remove the volume: `docker compose down --volumes`.
+
 ## Use
 
 `executives.json` is the access mapping of the prototype. There is no sign-in: `--executive` selects the Executive.

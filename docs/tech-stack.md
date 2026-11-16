@@ -18,6 +18,7 @@ This page lists the selected tools and services. The reasons for the decisions t
 | Configuration models | Pydantic |
 | Tracing | OpenTelemetry SDK with a JSONL exporter. `/trace` reads the JSONL file. |
 | Tests | pytest |
+| Container (optional) | Docker: `docker/Dockerfile` with the app and the Google Cloud CLI, and `compose.yaml`. It is for a reviewer whose host has only Docker. The hosted mode does not use it. |
 
 ## Production (GCP)
 

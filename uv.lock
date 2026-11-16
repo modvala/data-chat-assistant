@@ -417,6 +417,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 docs = [
     { name = "mkdocs-git-revision-date-localized-plugin" },
@@ -438,7 +439,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.2.0" }]
+dev = [
+    { name = "pytest", specifier = ">=9.2.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+]
 docs = [
     { name = "mkdocs-git-revision-date-localized-plugin", specifier = ">=1.7.0" },
     { name = "mkdocs-material", specifier = ">=9.8,<10" },
