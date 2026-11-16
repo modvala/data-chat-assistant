@@ -69,6 +69,7 @@ SYMBOLS = {
     "prompt": ("›", ">"),
     "dash": ("—", "-"),
     "more": ("…", "..."),
+    "arrow": ("→", "->"),
 }
 
 NOTICE_STYLE = {"info": ("dca.accent", "agent"), "warning": ("dca.warning", "warn"), "error": ("dca.danger", "error")}
@@ -85,6 +86,19 @@ COMMANDS = [
 ]
 
 WIDTH_MAX = 100
+
+# C3 Turn status. The text never contains SQL or data.
+STATUS_TEXT = {
+    "thinking": "Reading the question",
+    "sql": "Writing SQL",
+    "dry_run": "Checking the query",
+    "query": "Running the query",
+    "correction": "Fixing the query {sep} attempt {attempt} of {of}",
+    "retry": "Service is busy, trying again in {seconds} s",
+    "fallback": "Using the backup model",
+    "writing": "Writing the answer",
+}
+WARNING_STATES = frozenset({"correction", "retry", "fallback"})
 
 
 @dataclass(frozen=True)
@@ -167,6 +181,14 @@ class Renderer:
         self.notice(
             Notice(level="error", title="Unknown Executive ID", body="Valid IDs: " + ", ".join(valid_ids) + ".")
         )
+
+    # C3
+    def status_text(self, event: str, data: dict[str, Any]) -> str | None:
+        template = STATUS_TEXT.get(event)
+        return template.format(sep=self.sym("sep"), **data) if template else None
+
+    def start_status(self) -> "TurnStatus":
+        return TurnStatus(self)
 
     # C2
     def prompt(self, pending: bool) -> str:
@@ -259,7 +281,8 @@ class Renderer:
 
     def _block(self, block: Any) -> RenderableType:
         if isinstance(block, Text):
-            return RichText(block.markdown) if self.mode.plain else Markdown(block.markdown)
+            # Markdown draws Unicode bullets and rules, so plain and ASCII modes show the text as it is.
+            return RichText(block.markdown) if self.mode.plain or self.mode.ascii else Markdown(block.markdown)
         if isinstance(block, Heading):
             return RichText(block.text, style="dca.strong")
         if isinstance(block, Bullets):
@@ -415,7 +438,8 @@ class Renderer:
             duration = f"{row.duration_ms:,.0f} ms" if row.duration_ms < 1000 else f"{row.duration_ms / 1000:.1f} s"
             line = RichText(f"{branch} {row.label:<{width}}  ")
             line.append(f"{self.sym(status[row.status])} ", style=styles[row.status])
-            line.append(f"{row.detail:<38} {duration:>8}")
+            detail = row.detail.replace("→", self.sym("arrow"))
+            line.append(f"{detail:<38} {duration:>8}")
             self.out(line)
 
     # C11
@@ -442,3 +466,30 @@ class Renderer:
             text = RichText(f"{bar} ", style=style)
             text.append(line, style="dca.strong" if index == 0 else "dca.text")
             self.out(text)
+
+
+class TurnStatus:
+    """C3: one animated status line on a TTY, else one static line for each new state (motion.none)."""
+
+    def __init__(self, renderer: Renderer) -> None:
+        self.renderer = renderer
+        self.last: str | None = None
+        self.live = None
+        if renderer.mode.animation and not renderer.mode.plain:
+            self.live = renderer.console.status("", spinner="dots", refresh_per_second=8)
+            self.live.start()
+
+    def update(self, event: str, data: dict[str, Any]) -> None:
+        text = self.renderer.status_text(event, data)
+        if text is None or text == self.last:
+            return
+        self.last = text
+        style = "dca.warning" if event in WARNING_STATES else "dca.muted"
+        if self.live is not None:
+            self.live.update(RichText(text, style=style))
+        else:
+            self.renderer.out(RichText(f"{self.renderer.sym('sep')} {text}", style="dca.caption"))
+
+    def stop(self) -> None:
+        if self.live is not None:
+            self.live.stop()
