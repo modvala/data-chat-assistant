@@ -15,7 +15,7 @@ from typing import Any
 import sqlglot
 
 from dca.config import Settings
-from dca.core import backoff, budget, confirmation, context, drafting, input_guard, messages, reports
+from dca.core import backoff, budget, confirmation, context, drafting, input_guard, messages, reports, trace_view
 from dca.core.budget import TurnBudget
 from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, Result, SqlView, Text
 from dca.core.ports import (
@@ -229,6 +229,7 @@ class TurnAPI:
                 "save": self._cmd_save,
                 "list": self._cmd_list,
                 "undo": self._cmd_undo,
+                "trace": self._cmd_trace,
             }.get(name)
             if handler is None:
                 blocks: list = [Notice(level="info", title="Unknown command", body="Type /help to see the commands.")]
@@ -510,6 +511,20 @@ class TurnAPI:
             span.set("state", "restored")
             span.set("count", len(restored))
         return Answer(kind="answer", blocks=[Result(action="restored", count=len(restored))])
+
+    def _cmd_trace(self, state: SessionState, args: str) -> Answer:
+        """The span tree of a Turn, from the trace file (AC-R7.3). No LLM. With no ID: the last Turn."""
+        wanted = args.strip() or (state.turns[-1].trace_id if state.turns else "")
+        records = self.tracer.read(wanted) if wanted else []
+        trace_ids = {record["trace_id"] for record in records if record.get("type") == "span"}
+        if len(trace_ids) > 1:
+            notice = Notice(level="info", title="More than one trace has this ID", body="Type more characters of the ID.")
+            return Answer(kind="notice", blocks=[notice])
+        view = trace_view.build(records)
+        if view is None:
+            notice = Notice(level="info", title="No trace has this ID", body="Copy the ID from the line under an Answer.")
+            return Answer(kind="notice", blocks=[notice])
+        return Answer(kind="answer", blocks=[view])
 
     def _cmd_scope(self, state: SessionState, _args: str) -> Answer:
         entry = self.config.access(state.executive_id)

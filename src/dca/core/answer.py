@@ -127,6 +127,25 @@ class SqlView(BaseModel):
     error: str = ""
 
 
+class TraceRow(BaseModel):
+    label: str
+    status: Literal["ok", "error", "refusal", "info"]
+    detail: str = ""
+    duration_ms: float = 0
+
+
+class TraceView(BaseModel):
+    """The span tree of one Turn, for /trace (cli.md C15). Only our code makes it."""
+
+    type: Literal["trace"] = "trace"
+    source: Source = "code"
+    trace_id: str
+    started: datetime
+    duration_ms: float
+    outcome: str
+    rows: list[TraceRow]
+
+
 class TableRef(BaseModel):
     """A place for a table in an LLM draft. Our code fills it from the query rows."""
 
@@ -135,7 +154,18 @@ class TableRef(BaseModel):
 
 
 Block = Annotated[
-    Heading | Text | Bullets | Kpi | ActionItems | Table | Notice | Refusal | Confirmation | Result | SqlView,
+    Heading
+    | Text
+    | Bullets
+    | Kpi
+    | ActionItems
+    | Table
+    | Notice
+    | Refusal
+    | Confirmation
+    | Result
+    | SqlView
+    | TraceView,
     Field(discriminator="type"),
 ]
 
