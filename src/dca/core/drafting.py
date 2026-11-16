@@ -1,4 +1,8 @@
-"""Turns the LLM draft into an Answer. Our code makes each `table` block from the query rows."""
+"""Turns the LLM draft into an Answer. Our code makes each `table` block from the query rows.
+
+The block validator (`build_blocks`) keeps only the block types that the LLM may make (DS3):
+heading, text, bullets, kpi, action_items, and a table reference. It drops all other types.
+"""
 
 import json
 import re
@@ -18,6 +22,7 @@ from dca.core.answer import (
     Table,
     Text,
 )
+from dca.core import messages, output_guard
 from dca.core.turn import QueryRun, TurnContext
 
 _LLM_MODELS: dict[str, Any] = {
@@ -105,7 +110,15 @@ def answer_from_draft(text: str, turn: TurnContext, *, model: str, fallback_used
     blocks, dropped = build_blocks(parse_draft(text), turn)
     with turn.tracer.span("guard.output") as span:
         span.set("dropped_blocks", dropped)
-        span.set("decision", "allowed")
+        reason = output_guard.check(blocks)
+        span.set("decision", "blocked" if reason else "allowed")
+        span.set("reason", reason)
+    if reason:
+        return Answer(
+            kind="notice",
+            blocks=[messages.refusal("pii")],
+            provenance=provenance(turn, model=model, fallback_used=fallback_used),
+        )
     if not blocks:
         blocks = [Text(source="code", markdown="I have no answer for this question. Please ask it in a different way.")]
     return Answer(kind="answer", blocks=blocks, provenance=provenance(turn, model=model, fallback_used=fallback_used))

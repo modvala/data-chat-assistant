@@ -12,7 +12,7 @@ from typing import Any
 
 from dca.config import Settings
 from dca.core import context, drafting, input_guard, messages
-from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Text
+from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, Text
 from dca.core.ports import ConfigStore, Grant, KnowledgeStore, LLMClient, Role, SessionStore, Tracer, Warehouse
 from dca.core.state import QueryHandle, SessionState, TurnRecord
 from dca.core.demographic import THRESHOLD_VIEW
@@ -214,7 +214,8 @@ class TurnAPI:
             )
         except TurnStop as stop:
             return self._refusal(turn, stop), "refused"
-        return drafting.answer_from_draft(final, turn, model=model), "answered"
+        answer = drafting.answer_from_draft(final, turn, model=model)
+        return answer, "refused" if any(isinstance(block, Refusal) for block in answer.blocks) else "answered"
 
     def _refusal(self, turn: TurnContext, stop: TurnStop) -> Answer:
         self.tracer.log("turn.refusal", reason=stop.reason)
