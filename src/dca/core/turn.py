@@ -29,6 +29,16 @@ class QueryRun:
     rows: list[list[Any]]
     bytes_scanned: int
     customer_columns: tuple[str, ...] = ()
+    llm_sql: str = ""
+
+
+@dataclass(frozen=True)
+class DateRange:
+    """Today and the min and max order date of the data (HLD 9.3)."""
+
+    today: str
+    min_date: str
+    max_date: str
 
 
 @dataclass
@@ -48,6 +58,8 @@ class TurnContext:
     tracer: Tracer
     progress: Progress
     threshold: ThresholdState = field(default_factory=lambda: ThresholdState(None))
+    intent: str = "analysis"
+    dates: DateRange | None = None
     queries: dict[str, QueryRun] = field(default_factory=dict)
     attempts: list[SqlAttempt] = field(default_factory=list)
 

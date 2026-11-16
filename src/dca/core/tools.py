@@ -108,6 +108,7 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
         rows=rows,
         bytes_scanned=result.bytes_processed,
         customer_columns=verdict.customer_columns,
+        llm_sql=sql,
     )
     return {
         "query_id": query_id,

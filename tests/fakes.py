@@ -141,6 +141,7 @@ class FakeWarehouse:
     runs: list[Call] = field(default_factory=list)
     dry_runs: list[Call] = field(default_factory=list)
     cancels: list[str] = field(default_factory=list)
+    date_range: tuple[str, str] = ("2019-01-06", "2026-10-15")
 
     def on(
         self,
@@ -161,7 +162,7 @@ class FakeWarehouse:
     @property
     def queries(self) -> list[Call]:
         """The runs of LLM queries, without the brand list query of our code."""
-        return [run for run in self.runs if not run.job_id.startswith("dca-brands-")]
+        return [run for run in self.runs if not run.job_id.startswith(("dca-brands-", "dca-dates-"))]
 
     def dry_run(self, sql: str, params: dict[str, Sequence[str]]) -> int:
         self.dry_runs.append(Call(sql, {k: tuple(v) for k, v in params.items()}))
@@ -176,6 +177,8 @@ class FakeWarehouse:
         self.runs.append(Call(sql, {k: tuple(v) for k, v in params.items()}, job_id, max_bytes))
         if job_id.startswith("dca-brands-"):
             return QueryResult(job_id, ["brand"], [[b] for b in self.brands], 1000)
+        if job_id.startswith("dca-dates-"):
+            return QueryResult(job_id, ["min", "max"], [list(self.date_range)], 1000)
         rule = self._rule(sql)
         if rule.times is not None:
             rule.times -= 1

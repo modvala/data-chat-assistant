@@ -12,7 +12,8 @@ class QueryHandle(BaseModel):
 
     query_id: str
     trace_id: str
-    sql: str
+    sql: str  # the final SQL after the Brand scope rewrite, for /sql
+    llm_sql: str = ""  # the SQL that the LLM wrote, for the context of the next Turns
     columns: list[str]
     row_count: int
     bytes_scanned: int

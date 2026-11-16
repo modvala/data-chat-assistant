@@ -50,7 +50,7 @@ def test_ac_core_1_help_lists_only_the_commands_that_work(make_api: Callable[...
     result = run_cli(make_api(ScriptedLLM()), settings, "--executive", "mgr_ana", input="/help\n/exit\n")
     lines = [line.removeprefix("you › ") for line in result.output.splitlines()]
     commands = [line.split("\t")[0] for line in lines if line.startswith("/")]
-    assert commands == ["/help", "/scope", "/exit"]
+    assert commands == ["/help", "/scope", "/sql", "/exit"]
 
 
 def test_ac_core_1_scope_command_and_ctrl_d(make_api: Callable[..., TurnAPI], settings: Settings) -> None:

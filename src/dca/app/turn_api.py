@@ -8,15 +8,18 @@ import contextvars
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
+
+import sqlglot
 
 from dca.config import Settings
 from dca.core import context, drafting, input_guard, messages
-from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, Text
+from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, SqlView, Text
 from dca.core.ports import ConfigStore, Grant, KnowledgeStore, LLMClient, Role, SessionStore, Tracer, Warehouse
-from dca.core.state import QueryHandle, SessionState, TurnRecord
 from dca.core.demographic import THRESHOLD_VIEW
-from dca.core.turn import ThresholdState, TurnContext, TurnStop
+from dca.core.state import QueryHandle, SessionState, TurnRecord
+from dca.core.turn import DateRange, ThresholdState, TurnContext, TurnStop
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
@@ -81,6 +84,7 @@ class TurnAPI:
         knowledge: KnowledgeStore,
         llm: LLMClient,
         agent_loop: Any,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.settings = settings
         self.config = config_store
@@ -90,6 +94,8 @@ class TurnAPI:
         self.knowledge = knowledge
         self.llm = llm
         self.agent_loop = agent_loop
+        self.clock = clock
+        self._dates: DateRange | None = None
         self.access = AccessResolver(config_store, warehouse, settings)
         project, dataset = settings.google_cloud_project, settings.warehouse.threshold_dataset
         self.threshold = ThresholdState(f"{project}.{dataset}.{THRESHOLD_VIEW}" if project else None)
@@ -136,6 +142,8 @@ class TurnAPI:
                 elif decision.intent == "schema_question":
                     answer, outcome = self._schema_answer(turn), "answered"
                 else:
+                    turn.intent = decision.intent
+                    turn.dates = self._date_range()
                     answer, outcome = self._agent_turn(turn, text)
             except Exception as error:  # noqa: BLE001 - the Turn error handler (P15)
                 self.tracer.log("turn.error", error=type(error).__name__)
@@ -154,7 +162,7 @@ class TurnAPI:
         state = self._load(session_id)
         with self.tracer.span("command", command=name):
             trace_id = self.tracer.current_trace_id()
-            handler = {"scope": self._cmd_scope}.get(name)
+            handler = {"scope": self._cmd_scope, "sql": self._cmd_sql}.get(name)
             if handler is None:
                 blocks: list = [Notice(level="info", title="Unknown command", body="Type /help to see the commands.")]
                 return Answer(kind="notice", blocks=blocks, provenance=Provenance(trace_id=trace_id))
@@ -204,8 +212,31 @@ class TurnAPI:
         ]
         return Answer(kind="answer", blocks=blocks, provenance=drafting.provenance(turn, model=""))
 
+    def _date_range(self) -> DateRange | None:
+        """Today and the min and max order date: one cached query each day (HLD 9.3)."""
+        today = self.clock().date().isoformat()
+        if self._dates is None or self._dates.today != today:
+            dataset = self.settings.warehouse.source_dataset
+            try:
+                result = self.warehouse.run(
+                    f"SELECT MIN(DATE(created_at)), MAX(DATE(created_at)) FROM `{dataset}.orders`",
+                    {},
+                    max_bytes=self.settings.budget.query_bytes,
+                    timeout_s=self.settings.timeout.bq_job_s,
+                    job_id=f"dca-dates-{uuid.uuid4().hex}",
+                )
+                low, high = result.rows[0]
+                self._dates = DateRange(today, str(low)[:10], str(high)[:10])
+            except Exception as error:  # noqa: BLE001 - the Turn can go on without the date range
+                self.tracer.log("context.dates_unavailable", error=type(error).__name__)
+                return None
+        return self._dates
+
     def _agent_turn(self, turn: TurnContext, text: str) -> tuple[Answer, str]:
-        instruction = context.instruction(turn, self.knowledge.schema())
+        with self.tracer.span("context.assemble") as span:
+            instruction, tokens = context.instruction(turn, self.knowledge.schema())
+            for part, count in tokens.items():
+                span.set(f"tokens.{part}", count)
         model = self.settings.model
         try:
             # A copied context: the ADK run must not leave its span as the current span.
@@ -236,6 +267,7 @@ class TurnAPI:
                         query_id=handle_id,
                         trace_id=answer.provenance.trace_id,
                         sql=query.sql,
+                        llm_sql=query.llm_sql,
                         columns=query.columns,
                         row_count=len(query.rows),
                         bytes_scanned=query.bytes_scanned,
@@ -256,6 +288,20 @@ class TurnAPI:
         return state
 
     # --- Commands (no LLM)
+
+    def _cmd_sql(self, state: SessionState, _args: str) -> Answer:
+        """The final SQL of the last Answer, after the Brand scope rewrite (cli.md C14). No LLM."""
+        last = next((record for record in reversed(state.turns) if record.query_ids), None)
+        if last is None:
+            notice = Notice(level="info", title="The last Answer ran no SQL", body="Ask a question about the data first.")
+            return Answer(kind="notice", blocks=[notice])
+        handles = {handle.query_id: handle for handle in state.handles}
+        blocks: list = []
+        for query_id in last.query_ids:
+            handle = handles[query_id]
+            pretty = sqlglot.transpile(handle.sql, read="bigquery", write="bigquery", pretty=True)[0]
+            blocks.append(SqlView(sql=pretty, bytes_scanned=handle.bytes_scanned, row_count=handle.row_count))
+        return Answer(kind="answer", blocks=blocks)
 
     def _cmd_scope(self, state: SessionState, _args: str) -> Answer:
         entry = self.config.access(state.executive_id)

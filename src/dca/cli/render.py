@@ -11,12 +11,25 @@ from rich.console import Console, Group, RenderableType
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.syntax import Syntax
 from rich.table import Table as RichTable
 from rich.text import Text as RichText
 from rich.theme import Theme
 
 from dca.app.turn_api import SessionInfo
-from dca.core.answer import ActionItems, Answer, Bullets, Heading, Kpi, Notice, Provenance, Refusal, Table, Text
+from dca.core.answer import (
+    ActionItems,
+    Answer,
+    Bullets,
+    Heading,
+    Kpi,
+    Notice,
+    Provenance,
+    Refusal,
+    SqlView,
+    Table,
+    Text,
+)
 
 THEME = Theme(
     {
@@ -58,6 +71,7 @@ NOTICE_STYLE = {"info": ("dca.accent", "agent"), "warning": ("dca.warning", "war
 COMMANDS = [
     ("/help", "Show the commands."),
     ("/scope", "Show your Brand scope."),
+    ("/sql", "Show the SQL of the last Answer."),
     ("/exit", "End the session."),
 ]
 
@@ -84,6 +98,13 @@ def fmt_value(value: Any, column_type: str, dash: str) -> str:
     if column_type == "number" and isinstance(value, int | float):
         return f"{value:,.2f}"
     return str(value)
+
+
+def fmt_bytes(value: int) -> str:
+    for unit, size in (("GB", 1e9), ("MB", 1e6), ("KB", 1e3)):
+        if value >= size:
+            return f"{value / size:.1f} {unit}"
+    return f"{value} B"
 
 
 def scope_label(brands: list[str] | tuple[str, ...] | None, all_brands: bool, max_brands: int) -> str:
@@ -160,6 +181,11 @@ class Renderer:
 
     # C5
     def answer(self, answer: Answer) -> None:
+        for block in answer.blocks:
+            if isinstance(block, SqlView):
+                self.sql_view(block)
+        if any(isinstance(block, SqlView) for block in answer.blocks):
+            return
         notices = [block for block in answer.blocks if isinstance(block, Notice | Refusal)]
         content = [block for block in answer.blocks if not isinstance(block, Notice | Refusal)]
         if content:
@@ -283,6 +309,22 @@ class Renderer:
         self.out(line)
         for assumption in provenance.assumptions:
             self.out(RichText(f"  Assumed: {assumption}", style="dca.caption"))
+
+    # C14
+    def sql_view(self, block: SqlView) -> None:
+        parts = [fmt_bytes(block.bytes_scanned)]
+        if block.row_count is not None:
+            parts.append(f"{block.row_count:,} rows")
+        if block.error:
+            parts.append(f"error: {block.error}")
+        caption = f" {self.sym('sep')} ".join(parts)
+        if self.mode.plain:
+            self.out(block.sql)
+            self.out(caption)
+            return
+        syntax = Syntax(block.sql, "sql", theme="ansi_dark", line_numbers=True, word_wrap=True)
+        self.out(Panel(syntax, box=self._box, padding=(0, 1), width=min(self.console.width, WIDTH_MAX)))
+        self.out(RichText(f"  {caption}", style="dca.caption"))
 
     # C11
     def notice(self, notice: Notice) -> None:
