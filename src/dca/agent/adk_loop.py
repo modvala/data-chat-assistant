@@ -105,12 +105,15 @@ class TurnModel(BaseLlm):
                 if usage:
                     tokens_in = usage.prompt_token_count or tokens_in
                     tokens_out = usage.candidates_token_count or tokens_out
-                yield response
+            # Record the call before the first yield: when a tool ends the Turn, ADK closes this
+            # generator at the yield, and code after it does not run.
             span.set("tokens_in", tokens_in)
             span.set("tokens_out", tokens_out)
+            span.set("latency_ms", round((time.monotonic() - started) * 1000))
             if turn.budget:
                 turn.budget.add_tokens(tokens_in + tokens_out)
-            span.set("latency_ms", round((time.monotonic() - started) * 1000))
+            for response in responses:
+                yield response
 
 
 def _grant(state: Any) -> Grant:

@@ -199,6 +199,15 @@ class TurnAPI:
                 span.set("budget.llm_calls", turn.budget.llm_calls)
                 span.set("budget.llm_tokens", turn.budget.llm_tokens)
                 span.set("budget.bytes", turn.budget.bytes_scanned)
+                cost = self.settings.cost
+                span.set(
+                    "turn.cost_usd",
+                    round(
+                        turn.budget.llm_tokens / 1000 * cost.llm_usd_per_1k_tokens
+                        + turn.budget.bytes_scanned / 2**40 * cost.bq_usd_per_tib,
+                        6,
+                    ),
+                )
             if turn is not None and turn.stop_limit:
                 span.set("budget.limit", turn.stop_limit)
             self._active.pop(session_id, None)

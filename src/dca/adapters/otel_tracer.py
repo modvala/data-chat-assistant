@@ -159,6 +159,8 @@ class JsonlTracer:
                 wrapper.set(key, value)
             try:
                 yield wrapper
+            except GeneratorExit:
+                raise  # The caller closed a generator inside the span (ADK after a tool ends the Turn): no error.
             except BaseException as error:
                 otel.set_status(Status(StatusCode.ERROR, type(error).__name__))
                 raise

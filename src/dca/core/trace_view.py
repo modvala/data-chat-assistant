@@ -17,6 +17,10 @@ def _fmt_bytes(value: int) -> str:
     return f"{value} B"
 
 
+def _retries(count: int) -> str:
+    return f"{count} {'retry' if count == 1 else 'retries'}"
+
+
 def _row(span: dict[str, Any]) -> TraceRow | None:
     name = span["name"]
     a = span.get("attributes", {})
@@ -28,11 +32,11 @@ def _row(span: dict[str, Any]) -> TraceRow | None:
     if name == "llm.generate":
         detail = f"{a.get('tokens_in', 0):,} → {a.get('tokens_out', 0):,} tokens"
         if a.get("retries"):
-            detail += f" · {a['retries']} retries"
+            detail += f" · {_retries(a['retries'])}"
         if a.get("fallback_used"):
             detail += " · backup model"
         if a.get("error") and span.get("status") == "ERROR":
-            detail = f"{a['error']} · {a.get('retries', 0)} retries"
+            detail = f"{a['error']} · {_retries(a.get('retries', 0))}"
         status = "error" if span.get("status") == "ERROR" else "ok"
         return TraceRow(label=f"llm {a.get('model', '')}", status=status, detail=detail, duration_ms=duration)
     if name == "guard.sql":
@@ -51,8 +55,9 @@ def _row(span: dict[str, Any]) -> TraceRow | None:
         detail = f"{_fmt_bytes(int(a.get('bytes', 0)))} · {rows} {'row' if rows == 1 else 'rows'}"
         return TraceRow(label="bigquery", status="ok", detail=detail, duration_ms=duration)
     if name == "bq.diagnostic":
-        return TraceRow(label="empty result check", status="info",
-                        detail=f"{a.get('column', '')}: {a.get('values', 0)} values", duration_ms=duration)
+        found = "the value exists" if a.get("exists") else f"{a.get('values', 0)} other values"
+        return TraceRow(label="empty result check", status="info", detail=f"{a.get('column', '')}: {found}",
+                        duration_ms=duration)
     if name == "guard.output":
         blocked = a.get("decision") == "blocked"
         dropped = a.get("dropped_blocks") or []

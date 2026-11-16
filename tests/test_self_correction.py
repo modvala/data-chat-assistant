@@ -120,6 +120,7 @@ def test_ac_r5_1_empty_result_runs_one_diagnostic_and_suggests_the_close_value(
     make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse, settings: Settings
 ) -> None:
     warehouse.on("SUM", columns=["revenue"], rows=[])
+    warehouse.on("'Califronia'", columns=["state", "n"], rows=[])  # the existence check
     warehouse.on("COUNT", columns=["state", "n"], rows=[["California", 812], ["Texas", 640]])
     llm = ScriptedLLM(
         call(
@@ -138,7 +139,8 @@ def test_ac_r5_1_empty_result_runs_one_diagnostic_and_suggests_the_close_value(
     assert isinstance(notice, Notice) and notice.level == "info"
     assert notice.title == 'No orders from "Califronia"' and notice.body == "Did you mean California?"
     diagnostics = [run for run in warehouse.runs if run.job_id.startswith("dca-diag-")]
-    assert len(diagnostics) == 1 and "GROUP BY" in diagnostics[0].sql and "UNNEST(@brands)" in diagnostics[0].sql
+    assert len(diagnostics) == 2, "one existence check and one list of values"
+    assert all("GROUP BY" in run.sql and "UNNEST(@brands)" in run.sql for run in diagnostics)
     assert len(llm.requests) == 1, "the LLM wrote no Answer for an empty result"
     assert spans(settings, "bq.query")[-1]["attributes"]["rows"] == 0
 
@@ -147,6 +149,7 @@ def test_ac_r5_1_empty_result_on_a_normal_column_lists_real_values(
     make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse
 ) -> None:
     warehouse.on("SUM", columns=["revenue"], rows=[])
+    warehouse.on("'Delivered'", columns=["status", "n"], rows=[])  # the existence check
     warehouse.on("COUNT", columns=["status", "n"], rows=[["Complete", 9], ["Shipped", 5], ["Returned", 2]])
     llm = ScriptedLLM(call("run_query", sql=GOOD_SQL.replace("Complete", "Delivered")))
     api = make_api(llm)
@@ -196,3 +199,37 @@ def test_ac_r5_2_library_error_logs_go_to_the_trace_file_not_to_the_terminal(
     logs = [r for r in read_jsonl(Path(settings.paths.trace_file)) if r.get("event") == "library.log"]
     assert logs[-1]["logger"] == "google_adk.test" and logs[-1]["error"] == "RuntimeError"
     assert "Traceback" not in Path(settings.paths.trace_file).read_text(encoding="utf-8")
+
+
+def test_ac_r5_1_empty_result_with_an_existing_value_does_not_guess_a_typo(
+    make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse
+) -> None:
+    warehouse.on("SUM", columns=["revenue"], rows=[])
+    warehouse.on("COUNT", columns=["status", "n"], rows=[["Complete", 9]])
+    llm = ScriptedLLM(call("run_query", sql=GOOD_SQL + " AND category = 'Socks'"))
+    api = make_api(llm)
+
+    result = api.send_message(api.start_session("mgr_ana").session_id, "Revenue of complete orders of socks?")
+
+    assert result.blocks[0].title == "No data matches this question"  # type: ignore[union-attr]
+
+
+def test_ac_r2_3_far_value_on_a_demographic_route_is_a_threshold_refusal_not_a_guess(
+    make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse
+) -> None:
+    """A live run showed "No orders from Boston. Did you mean Houston?". Boston was hidden by the threshold."""
+    warehouse.on("AVG", columns=["age", "spend"], rows=[])
+    warehouse.on("'Boston'", columns=["city", "n"], rows=[])
+    warehouse.on("COUNT", columns=["city", "n"], rows=[["Houston", 90], ["Austin", 60]])
+    llm = ScriptedLLM(
+        call(
+            "run_query",
+            sql="SELECT c.age, AVG(i.sale_price) AS spend FROM scoped_customers AS c "
+            "JOIN scoped_order_items AS i ON c.id = i.user_id WHERE c.city = 'Boston' GROUP BY c.age",
+        )
+    )
+    api = make_api(llm)
+
+    result = api.send_message(api.start_session("mgr_ana").session_id, "Average spend by age in Boston?")
+
+    assert isinstance(result.blocks[0], Refusal) and result.blocks[0].reason == "threshold"

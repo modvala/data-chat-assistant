@@ -363,7 +363,7 @@ class Renderer:
     def sql_view(self, block: SqlView) -> None:
         parts = [fmt_bytes(block.bytes_scanned)] if block.bytes_scanned else []
         if block.row_count is not None:
-            parts.append(f"{block.row_count:,} rows")
+            parts.append(f"{block.row_count:,} {'row' if block.row_count == 1 else 'rows'}")
         if block.error:
             parts.append(f"{self.sym('error')} {block.error}")
         elif not parts:
