@@ -6,7 +6,7 @@ This page lists the selected tools and services. The reasons for the decisions t
 
 | Part | Selection |
 | --- | --- |
-| Language and dependencies | Python 3.12, uv with `pyproject.toml` and `uv.lock`, `requirements.txt` as a fallback (P19) |
+| Language and dependencies | Python 3.12, uv with `pyproject.toml` and `uv.lock` (P19) |
 | Agent framework | Google ADK 2.x; the spike passed ([ADR 0003](adr/0003-google-adk-framework.md)) |
 | LLM | `gemini-3.8-flash` as the main model, `gemini-3.5-flash-lite` as the fallback, from the Gemini API free tier. The model IDs and rate limits are in the configuration (P17). |
 | Embeddings | `gemini-embedding-2`, with an in-memory cosine search (numpy) over the Trios |
