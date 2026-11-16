@@ -446,7 +446,7 @@ The only component for a destructive action (P11, ADR 0002, AC-R3.1). Only the c
 | --- | --- | --- |
 | Pending | The panel, the prompt is `confirm ›` | The next message goes to the code check before the LLM. |
 | Confirmed | [C13 Result line](#c13-result-line), success | Soft delete and audit log entry. |
-| Cancelled | Info notice `Nothing was deleted.` | Then the agent handles the message as a normal question. |
+| Cancelled | Info notice `Nothing was deleted.` | Then the agent handles the message as a normal question. A message that is not analysis, such as "no, keep them", gets only the notice. |
 | Expired | Info notice `The delete request expired. Nothing was deleted.` | |
 | Wrong owner | Not possible: the preview lists only own reports (AC-R3.2). | |
 
@@ -526,6 +526,7 @@ stateDiagram-v2
     Working --> Ready: Ctrl+C, notice "Cancelled"
     Pending --> Done: exact reply text
     Pending --> Working: other message, "Nothing was deleted"
+    Pending --> Ready: a reply that is not analysis, "Nothing was deleted"
     Pending --> Ready: expired
     Answered --> Ready
     Refused --> Ready

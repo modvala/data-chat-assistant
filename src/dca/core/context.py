@@ -37,6 +37,8 @@ Tools:
 ANSWER_FORMAT = """\
 When you have the data, give the final answer as one JSON object and nothing else:
 {"blocks": [ ... ], "assumptions": [ ... ]}
+Always give the final answer as this JSON object, also for a follow-up or a short answer.
+To show the rows of an earlier Answer again, run its query again and use a table block.
 Block types:
 - {"type": "heading", "text": "..."}
 - {"type": "text", "markdown": "..."}
@@ -104,7 +106,10 @@ def conversation(state: SessionState, limit_tokens: int) -> str:
         used += estimate_tokens(text)
     parts = []
     if turns:
-        parts.append("Conversation so far (oldest first):\n" + "\n\n".join(turns))
+        parts.append(
+            "Conversation so far (oldest first). The Agent lines are short summaries of earlier Answers, "
+            "not the answer format:\n" + "\n\n".join(turns)
+        )
     if handles:
         parts.append("Earlier queries. You can run them again or change them:\n" + "\n".join(handles))
     return "\n\n".join(parts)

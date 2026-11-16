@@ -18,6 +18,7 @@ from dca.core.answer import (
     Column,
     Heading,
     Kpi,
+    Notice,
     Provenance,
     Table,
     Text,
@@ -74,13 +75,28 @@ DRAFT_SCHEMA = {
 }
 
 
+_BLOCKS_START = re.compile(r'(?:```(?:json)?\s*)?\{\s*"blocks"\s*:')
+
+
+def _split(text: str) -> tuple[str, str]:
+    """The prose before the JSON answer object, and the object with no code fence.
+
+    The model sometimes writes a paragraph, then the JSON object (live run, trace 14c308ba).
+    """
+    stripped = text.strip()
+    match = _BLOCKS_START.search(stripped)
+    if match is None or match.start() == 0:
+        return "", _FENCE.sub("", stripped)
+    return stripped[: match.start()].strip(), _FENCE.sub("", stripped[match.start() :])
+
+
 def is_broken_json(text: str) -> bool:
-    """True when the draft starts like a JSON object but does not parse."""
-    stripped = _FENCE.sub("", text.strip())
-    if not stripped.startswith("{"):
+    """True when the draft has a JSON object that does not parse."""
+    _prose, body = _split(text)
+    if not body.startswith("{"):
         return False
     try:
-        json.loads(stripped)
+        json.loads(body)
     except json.JSONDecodeError:
         return True
     return False
@@ -89,17 +105,19 @@ def is_broken_json(text: str) -> bool:
 def parse_draft(text: str) -> tuple[list[dict[str, Any]], list[str]]:
     """The LLM answers with `{"blocks": [...], "assumptions": [...]}`. Other text becomes one `text` block.
 
-    JSON that does not parse gives no blocks: the Executive never sees raw JSON.
+    Prose before the JSON object becomes a `text` block first. JSON that does not parse gives no
+    blocks: the Executive never sees raw JSON.
     """
-    stripped = _FENCE.sub("", text.strip())
+    prose, body = _split(text)
     try:
-        data = json.loads(stripped)
+        data = json.loads(body)
     except json.JSONDecodeError:
         if is_broken_json(text):
             return [], []
         return ([{"type": "text", "markdown": text.strip()}] if text.strip() else []), []
     if isinstance(data, dict) and isinstance(data.get("blocks"), list):
-        blocks = [block for block in data["blocks"] if isinstance(block, dict)]
+        lead = [{"type": "text", "markdown": prose}] if prose else []
+        blocks = lead + [block for block in data["blocks"] if isinstance(block, dict)]
         assumptions = [str(item) for item in data.get("assumptions") or [] if isinstance(item, str | int | float)]
         return blocks, assumptions
     return [{"type": "text", "markdown": text.strip()}], []
@@ -188,3 +206,25 @@ def answer_from_draft(text: str, turn: TurnContext, *, model: str, fallback_used
     checked = provenance(turn, model=model, fallback_used=fallback_used)
     checked.assumptions = assumptions
     return Answer(kind="answer", blocks=blocks, provenance=checked, report=turn.intent == "report")
+
+
+def results_answer(turn: TurnContext, *, model: str, fallback_used: bool = False) -> Answer:
+    """The draft does not parse, also after the repair. Show the query results, never raw JSON."""
+    if not turn.queries:
+        notice = Notice(
+            level="error",
+            title="I could not write the Answer",
+            body="Please ask the question again. Your session continues.",
+            trace_id=turn.trace_id,
+        )
+        return Answer(kind="notice", blocks=[notice], provenance=provenance(turn, model=model, fallback_used=fallback_used))
+    tables = json.dumps({"blocks": [{"type": "table", "query_id": query_id} for query_id in turn.queries]})
+    answer = answer_from_draft(tables, turn, model=model, fallback_used=fallback_used)
+    if answer.kind == "answer":
+        notice = Notice(
+            level="warning",
+            title="I could not write the analysis",
+            body="Here are the results of the queries. Ask again for the analysis.",
+        )
+        answer.blocks.insert(0, notice)
+    return answer

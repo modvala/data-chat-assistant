@@ -18,7 +18,7 @@ from dca.cli.main import make_app
 from dca.cli.render import THEME, Mode, Renderer
 from dca.config import Settings
 from dca.core import drafting
-from dca.core.answer import Answer, Notice
+from dca.core.answer import Answer, Notice, Table
 from tests.conftest import read_jsonl
 from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call, fail, tool_results
 
@@ -104,6 +104,21 @@ def test_ac_r5_2_backup_model_after_a_query_uses_new_bigquery_job_ids(
     assert result.kind == "answer" and result.provenance.fallback_used
     jobs = [run.job_id for run in warehouse.queries]
     assert len(jobs) == 2 and len(set(jobs)) == 2
+
+
+def test_ac_r5_2_backup_model_failure_after_queries_shows_the_query_results(
+    make_api: Callable[..., TurnAPI], settings: Settings, warehouse: FakeWarehouse
+) -> None:
+    # Live run, trace 7b7459ff: both models returned 429 after 3 queries with rows. The
+    # Executive got only an error notice.
+    warehouse.on("sale_price", columns=["revenue"], rows=[[10.0]])
+    llm = ScriptedLLM(fail(429), fail(429), fail(429), call("run_query", sql=SQL), fail(429), fail(429), fail(429))
+
+    result = ask(make_api(llm))
+
+    assert isinstance(result.blocks[0], Notice) and result.blocks[0].level == "warning"
+    assert [block.total_rows for block in result.blocks if isinstance(block, Table)] == [1]
+    assert spans(settings, "turn")[-1]["attributes"]["turn.outcome"] == "failed"
 
 
 def test_ac_r5_2_all_retries_and_the_backup_model_fail_gives_a_friendly_error(make_api: Callable[..., TurnAPI]) -> None:

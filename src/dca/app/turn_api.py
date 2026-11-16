@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, TypeVar
 
 import sqlglot
 
@@ -37,6 +37,7 @@ from dca.core.state import QueryHandle, SessionState, TurnRecord
 from dca.core.turn import DateRange, ThresholdState, TurnCancelled, TurnContext, TurnFinish, TurnStop
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
+T = TypeVar("T")
 
 
 def _pretty(sql: str) -> str:
@@ -172,8 +173,12 @@ class TurnAPI:
                     budget=TurnBudget(self.settings.budget),
                 )
                 self._active[session_id] = (turn, None, None)
-                decision = self._input_guard(text, progress, turn)
-                if decision.blocked:
+                # A reply to a delete preview is not a follow-up: classify it with no earlier questions.
+                decision = self._input_guard(text, progress, turn, follow_up=not gate_notices)
+                if decision.blocked and gate_notices and decision.reason == "intent":
+                    # A reply such as "no, keep them" to a delete preview only cancels it (cli.md P-TURN).
+                    answer, outcome = Answer(kind="notice", blocks=[]), "cancelled"
+                elif decision.blocked:
                     answer = self._refusal(turn, TurnStop("not_analysis", decision.reason))
                     outcome = "refused"
                 elif decision.intent == "schema_question":
@@ -287,7 +292,9 @@ class TurnAPI:
         result = Result(action="deleted", count=len(ids), undo_until=undo_until)
         return Answer(kind="answer", blocks=[result]), "done", []
 
-    def _input_guard(self, text: str, progress: ProgressCallback, turn: TurnContext) -> input_guard.InputDecision:
+    def _input_guard(
+        self, text: str, progress: ProgressCallback, turn: TurnContext, *, follow_up: bool = True
+    ) -> input_guard.InputDecision:
         with self.tracer.span("guard.input") as span:
             reason = input_guard.check_rules(text, self.settings.limits.input_max_chars)
             if reason is not None:
@@ -297,7 +304,7 @@ class TurnAPI:
                     if turn.budget:
                         turn.budget.before_llm_call()
                     # Only answered Turns: a refused message does not come back (HLD 9.4).
-                    earlier = [r.message for r in turn.session.turns if r.outcome == "answered"]
+                    earlier = [r.message for r in turn.session.turns if r.outcome == "answered" and follow_up]
                     earlier = earlier[max(0, len(earlier) - self.settings.limits.classifier_questions) :]
                     intent, tokens = self._classify(text, earlier, progress)
                     span.set("tokens", tokens)
@@ -314,10 +321,16 @@ class TurnAPI:
 
     def _classify(self, text: str, earlier: list[str], progress: ProgressCallback) -> tuple[str, int]:
         """The classifier call with backoff for a 429, a 5xx or a timeout (V8)."""
+        return self._llm_retry(
+            lambda: input_guard.classify(self.llm, text, model=self.settings.fallback_model, earlier=earlier), progress
+        )
+
+    def _llm_retry(self, call: Callable[[], T], progress: ProgressCallback) -> T:
+        """A direct LLM call with backoff for a 429, a 5xx or a timeout (V8)."""
         retry = self.settings.retry
         for attempt in range(retry.llm_retries + 1):
             try:
-                return input_guard.classify(self.llm, text, model=self.settings.fallback_model, earlier=earlier)
+                return call()
             except LLMTransientError as error:
                 if attempt == retry.llm_retries:
                     raise
@@ -391,6 +404,10 @@ class TurnAPI:
                 )
                 break
             except LLMUnavailable:
+                if fallback_used and turn.queries:
+                    # Both models are down, but the queries have rows: show them (HLD 15.3).
+                    self.tracer.log("turn.error", error="LLMUnavailable", answer_from_results=True)
+                    return drafting.results_answer(turn, model=model, fallback_used=True), "failed"
                 if fallback_used:
                     raise
             except TurnStop as stop:
@@ -400,20 +417,28 @@ class TurnAPI:
                 return finish.answer, finish.outcome
         if drafting.is_broken_json(final):
             final = self._repair_json(turn, final)
+            if drafting.is_broken_json(final):
+                return drafting.results_answer(turn, model=model, fallback_used=fallback_used), "failed"
         answer = drafting.answer_from_draft(final, turn, model=model, fallback_used=fallback_used)
         return answer, "refused" if any(isinstance(block, Refusal) for block in answer.blocks) else "answered"
 
     def _repair_json(self, turn: TurnContext, text: str) -> str:
-        """One call on the fallback model, with structured output, fixes the syntax of the draft.
+        """One call on the fallback model, with structured output and backoff, fixes the syntax of the draft.
 
-        A failure or a used budget keeps the draft, and `parse_draft` then shows no raw JSON.
+        A failure or a used budget keeps the draft. The Answer then shows the query results.
         """
         with self.tracer.span("answer.repair") as span:
             try:
                 if turn.budget:
                     turn.budget.before_llm_call()
-                result = self.llm.generate(
-                    text, model=self.settings.fallback_model, system=drafting.REPAIR_SYSTEM, json_schema=drafting.DRAFT_SCHEMA
+                result = self._llm_retry(
+                    lambda: self.llm.generate(
+                        text,
+                        model=self.settings.fallback_model,
+                        system=drafting.REPAIR_SYSTEM,
+                        json_schema=drafting.DRAFT_SCHEMA,
+                    ),
+                    turn.progress,
                 )
                 if turn.budget:
                     turn.budget.add_tokens(result.tokens_in + result.tokens_out)

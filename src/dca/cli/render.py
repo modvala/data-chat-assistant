@@ -304,7 +304,12 @@ class Renderer:
 
     # C7
     def _kpi(self, block: Kpi) -> RenderableType:
-        line = RichText.assemble((block.label + " ", "dca.label"), (block.value + (block.unit or ""), "dca.strong"))
+        value, unit = block.value, block.unit or ""
+        if unit.upper() in ("USD", "$"):
+            value, unit = "$" + value.removeprefix("$"), ""  # cli.md fmt.money: "$19,554.14"
+        elif unit and not unit.startswith("%"):
+            unit = " " + unit  # "532 orders", but "12%"
+        line = RichText.assemble((block.label + " ", "dca.label"), (value + unit, "dca.strong"))
         if block.delta:
             down = block.delta.strip().startswith("-")
             good = not down if block.good_direction == "up" else down
