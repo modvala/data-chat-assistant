@@ -16,11 +16,13 @@ from google.adk.models import BaseLlm, Gemini, LlmRequest, LlmResponse
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import ToolContext
+from google.genai import errors as genai_errors
 from google.genai import types
+import httpx
 from pydantic import ConfigDict
 
-from dca.core import tools
-from dca.core.ports import Grant, KnowledgeStore, LLMTransientError
+from dca.core import backoff, tools
+from dca.core.ports import Grant, KnowledgeStore, LLMTransientError, LLMUnavailable
 from dca.core.turn import TurnContext
 
 APP_NAME = "dca"
@@ -32,8 +34,28 @@ def gemini_factory(model: str) -> BaseLlm:
     return Gemini(model=model, retry_options=types.HttpRetryOptions(attempts=1))
 
 
+def transient_status(error: BaseException) -> tuple[int, float | None] | None:
+    """The status and the Retry-After seconds of a 429, a 5xx or a timeout. None for other errors."""
+    if isinstance(error, LLMTransientError):
+        return error.status, error.retry_after
+    if isinstance(error, genai_errors.APIError) and (error.code == 429 or (error.code or 0) >= 500):
+        headers = getattr(getattr(error, "response", None), "headers", None) or {}
+        try:
+            retry_after = float(headers.get("retry-after")) if headers.get("retry-after") else None
+        except (TypeError, ValueError):
+            retry_after = None
+        return error.code, retry_after
+    if isinstance(error, TimeoutError | httpx.TimeoutException):
+        return 504, None
+    return None
+
+
 class TurnModel(BaseLlm):
-    """Wraps the real model: one `llm.generate` span and one progress event for each call."""
+    """Wraps the real model: one `llm.generate` span and one progress event for each call.
+
+    A 429, a 5xx or a timeout gets backoff and not more than `llm_retries` retries (V8). After
+    them, it raises `LLMUnavailable`, and the Turn API runs the Turn again with the fallback model.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -56,14 +78,25 @@ class TurnModel(BaseLlm):
         with turn.tracer.span("llm.generate", model=self.inner.model, fallback_used=self.fallback_used) as span:
             started = time.monotonic()
             tokens_in = tokens_out = 0
-            responses = []
-            try:
-                async with asyncio.timeout(timeout_s):
-                    async for response in self.inner.generate_content_async(llm_request, stream):
-                        responses.append(response)
-            except TimeoutError:
-                span.set("error", "timeout")
-                raise LLMTransientError(504) from None
+            retries = turn.settings.retry.llm_retries
+            for attempt in range(retries + 1):
+                try:
+                    async with asyncio.timeout(timeout_s):
+                        responses = [r async for r in self.inner.generate_content_async(llm_request, stream)]
+                    break
+                except Exception as error:  # noqa: BLE001 - only transient errors get a retry
+                    found = transient_status(error)
+                    if found is None:
+                        raise
+                    status, retry_after = found
+                    span.set("retries", attempt)
+                    span.set("error", f"status {status}")
+                    if attempt == retries:
+                        raise LLMUnavailable(f"status {status}") from None
+                    wait = backoff.delay(attempt + 1, retry_after, turn.settings.retry)
+                    turn.progress("retry", {"seconds": max(1, round(wait))})
+                    await asyncio.sleep(wait)
+            span.set("retries", attempt)
             for response in responses:
                 usage = response.usage_metadata
                 if usage:

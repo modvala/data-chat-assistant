@@ -11,7 +11,7 @@ from google.adk.models import BaseLlm, LlmRequest, LlmResponse
 from google.genai import types
 from pydantic import ConfigDict
 
-from dca.core.ports import LLMResult, LLMTransientError, QueryResult, WarehouseError
+from dca.core.ports import LLMResult, LLMTransientError, QueryResult, WarehouseError, WarehouseTransientError
 
 ALL_BRANDS = ["Allegra K", "Calvin Klein", "Carhartt", "Columbia", "Levi's", "Nike", "Quiksilver", "Volcom"]
 
@@ -64,12 +64,17 @@ class ScriptedLLM:
         self.requests: list[tuple[str, LlmRequest]] = []
         self.classifier_calls: list[tuple[str, str]] = []
         self.always_fail: int | None = None
+        self.fail_models: set[str] = set()  # these models always fail with a 503
+        self.classifier_failures = 0  # the first n classifier calls fail with a 429
 
     # LLMClient port
     def generate(self, prompt: str, *, model: str, system: str = "", json_schema: dict | None = None) -> LLMResult:
         self.classifier_calls.append((model, prompt))
         if self.always_fail is not None:
             raise LLMTransientError(self.always_fail)
+        if self.classifier_failures:
+            self.classifier_failures -= 1
+            raise LLMTransientError(429)
         return LLMResult(text=json.dumps({"intent": self.intent}), tokens_in=50, tokens_out=5)
 
     # ADK model factory
@@ -80,6 +85,8 @@ class ScriptedLLM:
         self.requests.append((model, request))
         if self.always_fail is not None:
             return fail(self.always_fail)
+        if model in self.fail_models:
+            return fail(503)
         if not self.steps:
             return answer({"type": "text", "markdown": "Script ended."})
         step = self.steps.pop(0)
@@ -121,6 +128,7 @@ class Rule:
     error: str | None = None
     dry_error: str | None = None
     raise_error: BaseException | None = None
+    transient: bool = False  # a timeout of the job: WarehouseTransientError with the job ID
     times: int | None = None
 
 
@@ -184,6 +192,8 @@ class FakeWarehouse:
             rule.times -= 1
         if rule.raise_error is not None:
             raise rule.raise_error
+        if rule.transient:
+            raise WarehouseTransientError("timeout", job_id=job_id)
         if rule.error:
             raise WarehouseError(rule.error)
         return QueryResult(job_id, list(rule.columns), [list(r) for r in rule.rows], rule.bytes)

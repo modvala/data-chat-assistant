@@ -167,8 +167,9 @@ def test_ac_r7_1_one_trace_for_the_turn_with_adk_and_our_spans(
 def test_ac_r5_2_llm_call_that_hangs_stops_after_its_timeout(
     make_api: Callable[..., TurnAPI], make_settings: Callable[..., Settings]
 ) -> None:
-    settings = make_settings(timeout={"llm_call_s": 0.2})
-    api = make_api(ScriptedLLM(hang()), settings_=settings)
+    settings = make_settings(timeout={"llm_call_s": 0.1})
+    # 3 attempts on the main model and 3 on the fallback model.
+    api = make_api(ScriptedLLM(*[hang() for _ in range(6)]), settings_=settings)
     session = api.start_session("mgr_ana")
 
     started = time.monotonic()
