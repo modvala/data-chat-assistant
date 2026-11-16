@@ -86,6 +86,31 @@ def span_record(span: ReadableSpan) -> dict[str, Any]:
     }
 
 
+class JsonlLogHandler(logging.Handler):
+    """Library log records (ADK, google-genai) go to the trace file as JSON, never to the terminal.
+
+    The record keeps the logger, the level, the message and the error type, with no traceback,
+    so the Executive never sees a stack trace (cli.md P-FAIL).
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.name == __name__:
+            return
+        context = trace.get_current_span().get_span_context()
+        _FILE.write(
+            {
+                "type": "log",
+                "time": datetime.fromtimestamp(record.created, UTC).isoformat(),
+                "trace_id": format_trace_id(context.trace_id) if context.is_valid else "",
+                "event": "library.log",
+                "logger": record.name,
+                "level": record.levelname,
+                "message": record.getMessage()[:200],
+                "error": record.exc_info[0].__name__ if record.exc_info and record.exc_info[0] else "",
+            }
+        )
+
+
 _PROVIDER_LOCK = threading.Lock()
 _INSTALLED = False
 
@@ -100,6 +125,8 @@ def _install_provider() -> None:
             provider = TracerProvider()
             trace.set_tracer_provider(provider)
         provider.add_span_processor(SimpleSpanProcessor(JsonlSpanExporter()))
+        root = logging.getLogger()
+        root.addHandler(JsonlLogHandler(level=logging.WARNING))
         _INSTALLED = True
 
 

@@ -101,6 +101,7 @@ def provenance(turn: TurnContext, *, model: str, fallback_used: bool = False) ->
         all_brands=turn.grant.all_brands,
         sql=[query.sql for query in turn.queries.values()],
         bytes_scanned=turn.bytes_scanned,
+        corrections=sum(1 for attempt in turn.attempts if attempt.error),
         model=model,
         fallback_used=fallback_used,
         persona_version=turn.settings.persona_version,

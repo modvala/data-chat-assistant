@@ -75,7 +75,7 @@ NOTICE_STYLE = {"info": ("dca.accent", "agent"), "warning": ("dca.warning", "war
 COMMANDS = [
     ("/help", "Show the commands."),
     ("/scope", "Show your Brand scope."),
-    ("/sql", "Show the SQL of the last Answer."),
+    ("/sql [all]", "Show the SQL of the last Answer. With all: each attempt and its error."),
     ("/save [title]", "Save the last Answer as a Saved Report."),
     ("/list", "List your Saved Reports."),
     ("/undo", "Restore the reports of the last delete."),
@@ -334,11 +334,13 @@ class Renderer:
 
     # C14
     def sql_view(self, block: SqlView) -> None:
-        parts = [fmt_bytes(block.bytes_scanned)]
+        parts = [fmt_bytes(block.bytes_scanned)] if block.bytes_scanned else []
         if block.row_count is not None:
             parts.append(f"{block.row_count:,} rows")
         if block.error:
-            parts.append(f"error: {block.error}")
+            parts.append(f"{self.sym('error')} {block.error}")
+        elif not parts:
+            parts.append(f"{self.sym('ok')} ran")
         caption = f" {self.sym('sep')} ".join(parts)
         if self.mode.plain:
             self.out(block.sql)
