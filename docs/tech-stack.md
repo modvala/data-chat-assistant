@@ -38,6 +38,6 @@ This page lists the selected tools and services. The reasons for the decisions t
 | Part | Selection |
 | --- | --- |
 | Generator | Material for MkDocs 9.8 (end of life 2027-05-05; Zensical reads the same `mkdocs.yml`) |
-| Hosting | GitHub Pages, built by a GitHub Action from `docs/` (P24) |
-| Content | Architecture diagrams, the [coverage table](requirements-coverage.md), the ADRs, a VHS recording of the CLI and the eval report |
+| Hosting | GitHub Pages, built by a GitHub Action from `docs/site/` only (P24) |
+| Content | Overview, Get started, Executive guide, Key decisions; later the eval report and a VHS recording of the CLI |
 | Eval in CI | Workload Identity Federation for BigQuery, the Gemini key as a GitHub secret; runs on `workflow_dispatch` and on a push to `main` that changes `src/` or `eval/` |

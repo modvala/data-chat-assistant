@@ -1,5 +1,7 @@
 # Data Chat Assistant
 
+**Documentation site:** https://modvala.github.io/data-chat-assistant/
+
 A CLI chat agent for the Executives of a retail company. An Executive asks a question about the sales data in BigQuery in plain language. The agent writes the SQL at run time, runs it in the Brand scope of the Executive and gives an Answer with analysis and, on request, Action items. The prototype also has the four required features: safety and PII masking, a strict confirmation for deletes, resilience and observability.
 
 ## Setup
