@@ -21,6 +21,10 @@ _Avoid_: Brand owner
 **CEO**:
 The Executive who can analyze all data, with no brand limit. The CEO also owns the Persona.
 
+**Project client**:
+The company that ordered this project: OpsFleet. It sets the requirements and makes the decisions that the design cannot make alone.
+_Avoid_: Customer, client (alone)
+
 ### Access
 
 **Brand scope**:
@@ -28,18 +32,34 @@ The set of brands whose data an Executive can analyze. For a Manager, it is the 
 _Avoid_: Permissions, category scope
 
 **Effective scope**:
-The data that one query can read: the intersection of what the agent's service identity can read and the Brand scope of the Executive who asks.
+The data that one query can read: the intersection of what the agent permits and the Brand scope of the Executive who asks.
 _Avoid_: Access rights, scope (alone)
 
 ### Conversation
+
+**Turn**:
+One message from an Executive and the Answer that the agent gives to it.
+_Avoid_: Request, exchange
 
 **Answer**:
 One reply of the agent in the chat.
 _Avoid_: Report, response
 
+**Provenance**:
+The facts behind an Answer: the Brand scope, the assumptions, the Trios and the Metric variant that the agent used, and its SQL queries. Each Answer has its Provenance.
+_Avoid_: Transparency block, metadata
+
+**Action item**:
+One recommended next step in an Answer or a Saved Report, with the metric to watch. An Action item can name an owner.
+_Avoid_: Recommendation, task
+
 **Saved Report**:
 A stored analysis that an Executive asked the agent to keep. It belongs to the Executive who saved it, and it records the Customers that it mentions. Only its owner can delete it.
 _Avoid_: Report (alone), answer
+
+**Undo window**:
+The time after a delete in which the Executive can restore the deleted Saved Reports.
+_Avoid_: Grace period
 
 **Persona**:
 The organization-wide tone and the content rules for all Answers. The CEO changes it, and it has versions.
