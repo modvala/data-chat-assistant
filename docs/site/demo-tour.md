@@ -2,7 +2,7 @@
 
 **Status:** each scenario was tested on the real CLI on `main` ([issue #25](https://github.com/modvala/data-chat-assistant/issues/25)).
 
-This page has one demo scenario for each required acceptance criterion. Each one is **Available now**. An acceptance criterion is a check that shows that a requirement is done. The [coverage table](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md) links each criterion to its scenario, its code and its tests. [Home](index.md) tells how each feature works.
+This page has one scenario for each feature that is available now. Each scenario gives the inputs to type and what you see. [Home](index.md) tells how each feature works.
 
 Before you start, do the setup in [Get started](get-started.md).
 
@@ -31,7 +31,7 @@ The scenarios use the Executives of `executives.json`:
 - The Answers come from the language model, so the words and the figures change from run to run. The structure, the refusals, the notices and the provenance line come from our code, so they are the same each time. Each output below is short.
 - Each Answer shows its trace ID. To see the steps of any scenario, type `/trace` after it.
 
-## D1. Core chat (AC-CORE.1)
+## D1. Core chat
 
 The agent writes SQL at run time, keeps the conversation context and makes a report with Action items.
 
@@ -87,7 +87,7 @@ What you see:
 5. A notice `Saved "<title>"`. The report is kept.
 6. The report in the list, with its date.
 
-## D2. No PII in the output (AC-R2.1)
+## D2. No PII in the output
 
 1. Ask for personal data:
 
@@ -115,7 +115,7 @@ What you see:
 
 `/trace` after input 1 shows `sql validation ⊘ pii column`. All red-team cases of the automated tests are blocked.
 
-## D3. Brand scope (AC-R2.2)
+## D3. Brand scope
 
 1. Ask about your brands:
 
@@ -155,7 +155,7 @@ What you see:
 4. The session header with `Brand scope: all brands`.
 5. An Answer for all brands. The provenance line shows `Scope: all brands`.
 
-## D4. Analysis only, and small groups (AC-R2.3)
+## D4. Analysis only, and small groups
 
 1. Ask for something that is not analysis:
 
@@ -188,7 +188,7 @@ What you see:
 3. An Answer from the schema description, with no query.
 4. An Answer by age group. `/sql` shows `SELECT WITH AGGREGATION_THRESHOLD` on the threshold view: groups with fewer than 5 Customers are hidden ([ADR 0005](https://github.com/modvala/data-chat-assistant/blob/main/docs/adr/0005-aggregation-threshold-on-demographic-path.md)). If the threshold view is not available, `/sql` shows `HAVING COUNT(DISTINCT …) >= 5` in its place.
 
-## D5. Delete with a strict confirmation (AC-R3.1)
+## D5. Delete with a strict confirmation
 
 Make two Saved Reports that mention the same Customer. A Saved Report records the Customer IDs of its result rows, so ask questions that show Customers by ID. In inputs 5 and 8, use an ID that is in both lists in place of `4521`.
 
@@ -273,7 +273,7 @@ What you see:
 
 If you reply after 5 minutes, you see `The delete request expired. Nothing was deleted.`
 
-## D6. Only the owner can delete (AC-R3.2)
+## D6. Only the owner can delete
 
 D6 needs the Saved Reports of D5, but D5 ends with a delete. So first, in the chat of `mgr_ana`, type `/undo` to restore them (D7 explains it).
 
@@ -303,7 +303,7 @@ What you see:
 
 The automated tests also show two more rules. A pending confirmation does not work in a different session or for a different Executive. A changed set of reports gives a new preview.
 
-## D7. Soft delete and undo (AC-R3.3)
+## D7. Soft delete and undo
 
 In the session of `mgr_ana`, after input 9 of D5:
 
@@ -331,7 +331,7 @@ What you see:
 2. The two reports again.
 3. One audit entry for each delete and each undo, with the trace ID.
 
-## D8. Self-correction and empty results (AC-R5.1)
+## D8. Self-correction and empty results
 
 1. Ask with a typo in a value:
 
@@ -354,7 +354,7 @@ The language model sometimes fixes a typo before it writes the SQL. Then you get
 
 When the language model writes SQL that fails, the status line shows `Fixing the query · attempt 2 of 3`. Then the provenance line shows `1 correction`. `/sql all` shows each attempt and its error. After 2 failed corrections, you get an error notice with the trace ID.
 
-## D9. Service failures (AC-R5.2)
+## D9. Service failures
 
 1. Start the chat in chaos mode, which adds failures to the language model and to BigQuery:
 
@@ -372,7 +372,7 @@ What you see:
     - `Using the backup model`, and `backup model` in the provenance line, when the main model fails after its retries. On the Gemini free tier this also occurs with no chaos mode, because the main model often answers "high demand".
     - When all retries fail: `The data service did not answer. Please try again in a minute. Your session continues.` with the trace ID. The session continues, and there is no stack trace.
 
-## D10. Turn budgets and Ctrl+C (AC-R5.3)
+## D10. Turn budgets and Ctrl+C
 
 1. Start the chat with a smaller budget of model calls:
 
@@ -401,7 +401,7 @@ What you see:
 3. The session header.
 4. `Cancelled`, then the prompt comes back.
 
-## D11. Trace of each Turn (AC-R7.1)
+## D11. Trace of each Turn
 
 1. Ask a question:
 
@@ -429,7 +429,7 @@ What you see:
 
 The trace file `data/dca_traces.jsonl` has one trace for each Turn. It has the ADK spans and our spans in one tree, and JSON log lines with the trace ID. It has no personal data: only the final SQL, the column names, the row count and the first 20 rows after the output check.
 
-## D12. Metrics (AC-R7.2)
+## D12. Metrics
 
 1. After some Turns, compute the metrics:
 
@@ -450,7 +450,7 @@ What you see:
     - the completion rate and the abort rate of the confirmations
     - the budget stop rate
 
-## D13. The steps of a Turn (AC-R7.3)
+## D13. The steps of a Turn
 
 1. Show the steps of a Turn. Use a trace ID from an earlier Answer in place of `7f3a9c`:
 
