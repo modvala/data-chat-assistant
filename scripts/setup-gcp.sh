@@ -11,7 +11,8 @@
 #   - your user can impersonate dca-agent (no key file).
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID}"
+PROJECT_ID="${PROJECT_ID:-${GOOGLE_CLOUD_PROJECT:-}}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID or GOOGLE_CLOUD_PROJECT}"
 SA_NAME="${SA_NAME:-dca-agent}"
 DATASET="${DATASET:-dca_views}"
 # thelook_ecommerce is in the US multi-region. The views must be in the same location.
