@@ -22,7 +22,7 @@ An Executive is a person who chats with the agent: a brand manager or the CEO. A
 | --- | --- |
 | The agent writes SQL for each question, keeps the conversation and makes a report with Action items on request. | **Works in the prototype** |
 
-**See it:** [D1](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d1-core-chat-ac-core1) · **Details:** [HLD §6 Turn lifecycle](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#6-turn-lifecycle) · [Coverage: Core chat](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#core-chat-p1)
+**See it:** [D1](demo-tour.md#d1-core-chat-ac-core1) · **Details:** [HLD §6 Turn lifecycle](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#6-turn-lifecycle) · [Coverage: Core chat](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#core-chat-p1)
 
 ## R1. Hybrid Intelligence: Use what the analysts learned
 
@@ -50,7 +50,7 @@ An Executive is a person who chats with the agent: a brand manager or the CEO. A
 | Each query reads only the data of the Brand scope. A request for a different brand gets a refusal. | **Works in the prototype** |
 | A request that is not analysis gets a polite refusal. A result by age, gender or place hides small groups of Customers. | **Works in the prototype** |
 
-**See it:** [D2](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d2-no-pii-in-the-output-ac-r21) · [D3](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d3-brand-scope-ac-r22) · [D4](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d4-analysis-only-and-small-groups-ac-r23) · **Details:** [HLD §8 Safety pipeline](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#8-safety-pipeline) · [Coverage: R2](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r2-safety--pii-masking)
+**See it:** [D2](demo-tour.md#d2-no-pii-in-the-output-ac-r21) · [D3](demo-tour.md#d3-brand-scope-ac-r22) · [D4](demo-tour.md#d4-analysis-only-and-small-groups-ac-r23) · **Details:** [HLD §8 Safety pipeline](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#8-safety-pipeline) · [Coverage: R2](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r2-safety--pii-masking)
 
 ## R3. High-Stakes Oversight: Nothing is deleted without your yes
 
@@ -76,7 +76,7 @@ flowchart TB
 | An Executive can delete only their own Saved Reports. "Reports that mention Customer X" matches on the Customer IDs that each Saved Report records. | **Works in the prototype** |
 | The delete is soft and writes an audit record. The `/undo` command restores the reports during the Undo window. | **Works in the prototype** |
 
-**See it:** [D5](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d5-delete-with-a-strict-confirmation-ac-r31) · [D6](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d6-only-the-owner-can-delete-ac-r32) · [D7](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d7-soft-delete-and-undo-ac-r33) · **Details:** [HLD §10 Destructive operations](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations) · [Coverage: R3](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r3-high-stakes-oversight)
+**See it:** [D5](demo-tour.md#d5-delete-with-a-strict-confirmation-ac-r31) · [D6](demo-tour.md#d6-only-the-owner-can-delete-ac-r32) · [D7](demo-tour.md#d7-soft-delete-and-undo-ac-r33) · **Details:** [HLD §10 Destructive operations](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#10-destructive-operations) · [Coverage: R3](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r3-high-stakes-oversight)
 
 ## R4. Continuous Improvement (Learning Loop): It learns how you like your Answers
 
@@ -116,7 +116,7 @@ flowchart TB
 | When the language model fails, the agent waits and tries again, then uses the backup model. When the warehouse fails, the agent tries again. If all tries fail, a friendly notice shows the trace ID, and the session continues. | **Works in the prototype** |
 | Each Turn has a budget for model calls, tokens, scanned data and time. When a Turn goes over the budget, the agent stops and tells the Executive why. | **Works in the prototype** |
 
-**See it:** [D8](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d8-self-correction-and-empty-results-ac-r51) · [D9](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d9-service-failures-ac-r52) · [D10](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d10-turn-budgets-and-ctrlc-ac-r53) · **Details:** [HLD §15 Resilience and error handling](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#15-resilience-and-error-handling) · [Coverage: R5](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r5-resilience--graceful-error-handling)
+**See it:** [D8](demo-tour.md#d8-self-correction-and-empty-results-ac-r51) · [D9](demo-tour.md#d9-service-failures-ac-r52) · [D10](demo-tour.md#d10-turn-budgets-and-ctrlc-ac-r53) · **Details:** [HLD §15 Resilience and error handling](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#15-resilience-and-error-handling) · [Coverage: R5](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r5-resilience--graceful-error-handling)
 
 ## R6. Quality Assurance: Tested before each release
 
@@ -144,7 +144,7 @@ flowchart TB
 | The documents define the agent metrics before the code, and each metric comes from the trace. | **Works in the prototype** |
 | The `/trace` command shows the full dialog of a Turn again, step by step. | **Works in the prototype** |
 
-**See it:** [D11](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d11-trace-of-each-turn-ac-r71) · [D12](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d12-metrics-ac-r72) · [D13](https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md#d13-the-steps-of-a-turn-ac-r73) · **Details:** [HLD §16 Observability](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#16-observability) · [Coverage: R7](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r7-observability)
+**See it:** [D11](demo-tour.md#d11-trace-of-each-turn-ac-r71) · [D12](demo-tour.md#d12-metrics-ac-r72) · [D13](demo-tour.md#d13-the-steps-of-a-turn-ac-r73) · **Details:** [HLD §16 Observability](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#16-observability) · [Coverage: R7](https://github.com/modvala/data-chat-assistant/blob/main/docs/requirements-coverage.md#r7-observability)
 
 ## R8. Agility (Persona Management): Change the tone with no deployment
 

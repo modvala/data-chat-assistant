@@ -19,12 +19,11 @@ nav:
       - How it works: how-it-works.md
       - Requirements: requirements.md
       - Key decisions: decisions.md
-  # Until #44 moves them to docs/site/, these pages link to their sources on github.com.
   - Try it:
-      - Get started: https://github.com/modvala/data-chat-assistant/blob/main/README.md#setup
-      - Demo tour: https://github.com/modvala/data-chat-assistant/blob/main/docs/demo.md
+      - Get started: get-started.md
+      - Demo tour: demo-tour.md
   - Use it:
-      - Executive guide: https://github.com/modvala/data-chat-assistant/blob/main/README.md#use
+      - Executive guide: guide.md
 
 theme:
   name: material

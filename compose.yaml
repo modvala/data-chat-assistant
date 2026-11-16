@@ -1,5 +1,5 @@
 # The Docker setup for a reviewer (#40). Each command: docker compose run --rm dca <command>.
-# The README section "Run with Docker" gives the steps.
+# The steps are in docs/site/get-started.md, section "Run with Docker".
 services:
   dca:
     build:
