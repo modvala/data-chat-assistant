@@ -165,7 +165,7 @@ The CLI uses the ASCII fallback when the output encoding is not UTF-8 or when th
 
 | Token | Value | Rule |
 | --- | --- | --- |
-| `width.max` | 100 columns | The Answer panel does not grow wider, also on a wide terminal. Long lines are hard to read. |
+| `width.max` | 100 columns | The Answer panel does not grow wider, also on a wide terminal. Long lines are hard to read. Exception: a panel with a wider table grows to the table width, up to the terminal width ([C6](#c6-data-table)). |
 | `width.min` | 60 columns | Below this width, tables change to a key-value list ([C6](#c6-data-table)). |
 | `width.chart` | 40 columns | The maximum bar length. |
 
@@ -303,6 +303,8 @@ The container of one Answer.
 | Header | `dca.label`. |
 | Numbers | Right aligned, formatted with `fmt.*` by column type. |
 | Maximum rows shown | 20. More rows: the first 20 and a line `Showing 20 of 312 rows. Ask to filter or group them.` in `dca.warning`. |
+| Width | The panel grows past `width.max` to the table width, up to the terminal width. |
+| Long values | A value never gets cut with `…`. If the terminal is too narrow, the value continues on the next line. |
 | Maximum columns | Not in the prototype yet. 6. More columns: the core makes two tables, or the renderer uses the key-value variant. |
 | Empty cell | `—` in `dca.muted`. |
 | Customer column | Shows `user_id` or the pseudonym (DS8). |
