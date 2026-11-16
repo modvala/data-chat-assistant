@@ -1448,7 +1448,7 @@ Cost of the prototype: $0.
 | Warehouse | BigQuery sandbox | 1 TB of free query compute each month (technical assignment). The dataset is smaller than 1 GB (V28). | $0 |
 | Stores and traces | Local files: SQLite, YAML, JSON, JSONL | The disk of the reviewer's machine | $0 |
 
-Setup: `uv sync`, copy `.env.example` to `.env`, `gcloud auth application-default login`, `uv run setup-bq`, `uv run chat --executive <id>` (P19).
+Setup: `uv sync`, copy `.env.example` to `.env`, `scripts/setup-gcp.sh` (a project in the BigQuery sandbox and the read-only service account `dca-agent`), `gcloud auth application-default login --impersonate-service-account=dca-agent@<project>.iam.gserviceaccount.com`, `uv run setup-bq`, `uv run chat --executive <id>` (P19). There is no service account key file.
 
 ## 20. Deployment
 
@@ -1531,7 +1531,7 @@ The decisions that are hard to change have an ADR (P18).
 | Brand scope | Rewrite of logical scoped views, plus row access policies as the Executive on a curated copy in production | Brand scope only in code; row access policies only | Two layers cost more work, but one bug cannot leak data | [0001](../adr/0001-brand-scope-by-view-rewrite.md) |
 | Delete safety | The LLM only plans; the Confirmation gate catches the reply | ADK `require_confirmation` on a delete tool | More code, but no prompt can make the LLM delete | [0002](../adr/0002-llm-has-no-delete-tool.md) |
 | Delete reply | `yes` for 1, `delete n` for 2 or more; the binding is internal | A random confirmation code | Easy to type; the store binding gives the safety | [0002](../adr/0002-llm-has-no-delete-tool.md) |
-| Agent framework | Google ADK as a thin adapter, after a spike | LangGraph; plain `google-genai`; PydanticAI | Good GCP fit and callbacks; no team experience, so the core stays framework-free | [0003](../adr/0003-google-adk-framework.md) |
+| Agent framework | Google ADK as a thin adapter; the spike passed | LangGraph; plain `google-genai`; PydanticAI | Good GCP fit and callbacks; no team experience, so the core stays framework-free | [0003](../adr/0003-google-adk-framework.md) |
 | Compute and state | Cloud Run and Firestore | Agent Platform Runtime with Sessions and Memory Bank | More code, but structured, editable state in our own store and less lock-in | [0004](../adr/0004-cloud-run-and-firestore.md) |
 | Small groups | Aggregation threshold view only on the demographic path | Threshold on all Customer data; `HAVING` only | "Top customers" still works; the routing is our code | [0005](../adr/0005-aggregation-threshold-on-demographic-path.md) |
 | Eval data | Eval set separate from the Golden Bucket | Leave-one-out on Trios | More data to keep, but an honest score | [0006](../adr/0006-eval-set-separate-from-golden-bucket.md) |
@@ -1588,7 +1588,7 @@ The decisions that are hard to change have an ADR (P18).
 | --- | --- | --- | --- | --- |
 | 1 | Does one desktop OAuth login give both the IAP token and the BigQuery token? | IAP needs an identity token. BigQuery needs an access token. | Design team | Test in a GCP project. Fallback: two documented logins. |
 | 2 | Does one row access policy with `SESSION_USER()` and a subquery on the access table work on the curated copy? | Not verified (ADR 0001). | Design team | Test in a GCP project. Fallback: one authorized view for each Manager group. |
-| 3 | Does `SELECT WITH AGGREGATION_THRESHOLD` work on a view over the public table? | The ADK spike checks it (ADR 0003). | Design team | Fallback: `HAVING COUNT(DISTINCT user_id) >= 5` (ADR 0005). |
+| 3 | Does `SELECT WITH AGGREGATION_THRESHOLD` work on a view over the public table? | Answered on 2026-11-16: yes. The ADK spike checked it ([ADR 0005](../adr/0005-aggregation-threshold-on-demographic-path.md#spike-result)). | Design team | Closed. `HAVING COUNT(DISTINCT user_id) >= 5` stays for an expired view (ADR 0005). |
 | 4 | Does VPC Service Controls block the read of the public dataset for the scheduled copy? | The perimeter can block a read of a dataset outside it. | Design team | Test: run the copy from a project inside a test perimeter. |
 | 5 | Which Cloud Run CPU allocation do we need? | The server-sent events and the work after each Turn can need CPU outside a request. | Design team | Test: measure the latency and the cost at the peak of V5. |
 | 6 | How does the Executive profile learn in production? | V21 fixes no logic and no numbers. | Design team | Test: a pairwise UX test and the online signals before the release. |
