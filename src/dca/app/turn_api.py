@@ -15,7 +15,8 @@ from dca.core import context, drafting, messages
 from dca.core.answer import Answer, Bullets, Notice, Provenance, Text
 from dca.core.ports import ConfigStore, Grant, KnowledgeStore, Role, SessionStore, Tracer, Warehouse
 from dca.core.state import QueryHandle, SessionState, TurnRecord
-from dca.core.turn import TurnContext, TurnStop
+from dca.core.demographic import THRESHOLD_VIEW
+from dca.core.turn import ThresholdState, TurnContext, TurnStop
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
@@ -88,6 +89,8 @@ class TurnAPI:
         self.knowledge = knowledge
         self.agent_loop = agent_loop
         self.access = AccessResolver(config_store, warehouse, settings)
+        project, dataset = settings.google_cloud_project, settings.warehouse.threshold_dataset
+        self.threshold = ThresholdState(f"{project}.{dataset}.{THRESHOLD_VIEW}" if project else None)
 
     # --- Operations of HLD 5.1
 
@@ -121,6 +124,7 @@ class TurnAPI:
                     warehouse=self.warehouse,
                     tracer=self.tracer,
                     progress=progress,
+                    threshold=self.threshold,
                 )
                 progress("thinking", {})
                 answer, outcome = self._agent_turn(turn, text)

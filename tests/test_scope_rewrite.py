@@ -20,9 +20,9 @@ CEO = Grant("ceo", "ceo", ("Allegra K", "Calvin Klein", "Nike"))
 
 QUERIES = [
     "SELECT brand, SUM(sale_price) AS revenue FROM scoped_order_items GROUP BY brand",
-    "SELECT * FROM scoped_customers",
+    "SELECT id, traffic_source, country FROM scoped_customers",
     "SELECT o.order_id, COUNT(*) AS n FROM scoped_orders o JOIN scoped_order_items i ON i.order_id = o.order_id GROUP BY 1",
-    "WITH t AS (SELECT user_id, sale_price FROM scoped_order_items) SELECT c.state, SUM(t.sale_price) AS s "
+    "WITH t AS (SELECT user_id, sale_price FROM scoped_order_items) SELECT c.traffic_source, SUM(t.sale_price) AS s "
     "FROM t JOIN scoped_customers c ON c.id = t.user_id GROUP BY 1",
     "SELECT scoped_orders.status FROM scoped_orders",
     "SELECT status FROM scoped_orders UNION ALL SELECT status FROM scoped_order_items",
@@ -31,7 +31,7 @@ QUERIES = [
 
 
 def allowed(sql: str, grant: Grant = MANAGER) -> sql_guard.Allowed:
-    verdict = sql_guard.check(sql, grant, source_dataset=DATASET)
+    verdict = sql_guard.check(sql, grant, source_dataset=DATASET, sql_limit=50)
     assert isinstance(verdict, sql_guard.Allowed), verdict
     return verdict
 
@@ -106,7 +106,7 @@ def test_ac_r2_2_multi_brand_order_counts_only_items_in_scope(db: sqlite3.Connec
 
 def test_ac_r2_2_orders_and_customers_come_only_through_items_in_scope(db: sqlite3.Connection) -> None:
     assert run(db, "SELECT order_id FROM scoped_orders") == [(10,)]
-    assert run(db, "SELECT id, city FROM scoped_customers") == [(7, "Boston")]
+    assert run(db, "SELECT id, traffic_source FROM scoped_customers") == [(7, "Search")]
 
 
 def test_ac_r2_2_ceo_sees_all_items(db: sqlite3.Connection) -> None:
