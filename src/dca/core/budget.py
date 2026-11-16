@@ -39,6 +39,9 @@ class TurnBudget:
         if self.remaining_s() <= 0:
             raise TurnStop("budget", "wall_time")
 
+    def llm_calls_left(self) -> int:
+        return self.limits.llm_calls - self.llm_calls
+
     def before_llm_call(self) -> None:
         self.check_time()
         if self.llm_calls >= self.limits.llm_calls:

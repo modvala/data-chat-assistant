@@ -14,7 +14,7 @@ from dca.config import Settings
 from dca.cli.render import THEME, Mode, Renderer
 from dca.core.answer import ActionItems, Answer, Kpi, SqlView, Table
 from tests.conftest import read_jsonl
-from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call
+from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call, text
 
 TEXAS_SQL = (
     "SELECT c.state, SUM(i.sale_price) AS revenue FROM scoped_order_items AS i "
@@ -55,6 +55,20 @@ def test_ac_core_1_follow_up_gets_the_earlier_turns_and_query_handles(make_api: 
     assert "Texas revenue is $12,400." in context
     assert "Earlier queries" in context and "c.state = 'Texas'" in context
     assert "_dca_" not in context, "the context must hold the SQL of the LLM, not the rewritten SQL"
+
+
+def test_ac_r2_3_instruction_gives_the_demographic_query_rules_from_the_guard(make_api: Callable[..., TurnAPI]) -> None:
+    # Live run, trace bd373e4a: the SQL guard blocked 3 demographic queries in a row, because the
+    # LLM learned the rules only from the error messages.
+    llm = ScriptedLLM(answer({"type": "text", "markdown": "x"}))
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    api.send_message(session.session_id, "How does the spend in California compare to Texas?")
+
+    context = instruction_of(llm)
+    assert "COUNT(DISTINCT scoped_customers.id)" in context
+    assert "scoped_order_items: user_id, order_id, sale_price, status, created_at, brand, category" in context
 
 
 def test_ac_core_1_conversation_stays_within_the_v18_limit(
@@ -177,6 +191,47 @@ def test_ac_core_1_report_has_kpis_findings_action_items_and_offers_save(
     output = capsys.readouterr().out
     assert "1. Increase stock of jeans" in output and "Watch: sell-through rate" in output
     assert output.rstrip().splitlines()[-1].endswith("/sql · /save")
+
+
+# Live run, trace 154f674a: the backup model wrote `{"type": "action_items": [` and the Q1 report
+# showed as raw JSON.
+BROKEN_REPORT = (
+    '{"blocks": [{"type": "heading", "text": "Q1 report"}, '
+    '{"type": "action_items": [{"action": "Increase stock of jeans", "metric": "sell-through rate"}]}]}'
+)
+FIXED_REPORT = (
+    '{"blocks": [{"type": "heading", "text": "Q1 report"}, {"type": "action_items", '
+    '"items": [{"action": "Increase stock of jeans", "metric": "sell-through rate"}]}]}'
+)
+
+
+def test_ac_core_1_answer_json_that_does_not_parse_gets_one_repair_call(
+    make_api: Callable[..., TurnAPI], settings: Settings
+) -> None:
+    llm = ScriptedLLM(call("run_query", sql=MONTHLY_SQL), text(BROKEN_REPORT), intent="report")
+    llm.repairs = [FIXED_REPORT]
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Create a report for Q1 with action items for Q2")
+
+    assert llm.repair_calls == [(settings.fallback_model, BROKEN_REPORT)]
+    assert next(block for block in result.blocks if isinstance(block, ActionItems)).items[0].metric
+    assert spans(settings, "answer.repair")[0]["attributes"]["repaired"] is True
+
+
+def test_ac_core_1_answer_json_that_cannot_be_repaired_is_never_shown_raw(
+    make_api: Callable[..., TurnAPI], capsys: pytest.CaptureFixture[str]
+) -> None:
+    llm = ScriptedLLM(call("run_query", sql=MONTHLY_SQL), text(BROKEN_REPORT), intent="report")
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Create a report for Q1 with action items for Q2")
+
+    plain(result)
+    output = capsys.readouterr().out
+    assert '"blocks"' not in output and "ask it in a different way" in output
 
 
 def test_ac_core_1_table_with_more_than_20_rows_shows_20_and_the_filter_hint(

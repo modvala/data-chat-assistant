@@ -4,6 +4,7 @@ The safety layer and the tool rules are locked in code. The tone is fixed and bu
 (no `persona.yaml` in the Must scope); the trace records `persona_version`.
 """
 
+from dca.core import demographic
 from dca.core.answer import ActionItems, Answer, Bullets, Heading, Kpi, Notice, Refusal, Table, Text
 from dca.core.state import SessionState
 from dca.core.turn import DateRange, TurnContext
@@ -26,6 +27,7 @@ Tools:
 - run_query(sql): runs one SELECT. The result has a query_id, the columns and up to 50 rows.
   If the result is an error, fix the SQL and call run_query again.
   If the result says "not permitted", stop and do not try a different query.
+  If the result has "stop", do not call run_query again. Write the final answer.
 - describe_schema(): returns the description of the scoped views.
 - save_report(title): saves the last Answer as a Saved Report, when the Executive asks to save it.
 - list_reports(): lists the Saved Reports of the Executive.
@@ -120,7 +122,7 @@ def instruction(turn: TurnContext, schema_description: str) -> tuple[str, dict[s
     """The instruction and the LLM tokens of each part (for the context.assemble span)."""
     parts = {
         "safety": SAFETY_LAYER + "\n\n" + TONE + "\n\n" + TOOL_RULES,
-        "schema": "Schema of the scoped views:\n" + schema_description,
+        "schema": "Schema of the scoped views:\n" + schema_description + "\n\n" + demographic.rules_text(),
         "dates": dates_text(turn.dates) if turn.dates else "",
         "conversation": conversation(turn.session, turn.settings.limits.conversation_tokens),
         "format": ANSWER_FORMAT + ("\n\n" + REPORT_FORMAT if turn.intent == "report" else ""),
