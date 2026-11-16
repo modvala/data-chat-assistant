@@ -7,7 +7,7 @@ This page defines how the agent shows Answers to an Executive. It has two parts:
 
 A later web chat or chat bot uses the same Answer model. It needs only a new renderer and its own tokens.
 
-Related principles and decisions: P9 (no raw PII), P11 and [ADR 0002](../adr/0002-llm-has-no-delete-tool.md) (confirmation), P15 (errors), P16 (trace), P20 (thin client), P22 (transparent Answers). The acceptance criteria are in the [coverage table](../requirements-coverage.md).
+Related principles and decisions: P9 (no raw PII), P11 and [ADR 0002](../adr/0002-llm-has-no-delete-tool.md) (confirmation), P15 (errors), P16 (trace), P20 (thin client), P22 (transparent Answers). The acceptance criteria are in the [coverage table](../requirements-coverage.md). The system, the [Turn API](hld.md#5-turn-api) and the rules that this page shows are in the [high-level design](hld.md).
 
 ## Contents
 
@@ -439,7 +439,7 @@ The only component for a destructive action (P11, ADR 0002, AC-R3.1). Only the c
 | --- | --- | --- |
 | 0 | No panel. An info notice: `No Saved Reports of yours mention Customer 48213.` | |
 | 1 | `yes` | AC-R3.1. |
-| 2–3 | `delete n` | Proposal. See [Open questions](#open-questions). |
+| 2–3 | `delete n` | AC-R3.1. The rules are in [HLD 10.3](hld.md#103-rules). |
 | More than 3 | `delete n` | AC-R3.1. |
 
 | State | Look | Behavior |
@@ -631,7 +631,12 @@ The terms follow [CONTEXT.md](../../CONTEXT.md): Executive (not user), Answer (n
 
 ## Open questions
 
-1. **Reply text for 2–3 reports.** AC-R3.1 sets `yes` for 1 report and `delete n` for more than 3. This page proposes `delete n` also for 2–3. Is this correct?
-2. **Confirmation code.** ADR 0002 says "a short confirmation code". AC-R3.1 uses `yes` and `delete n`. This page treats the reply text as the code, because the pending confirmation is bound in the store to the Executive, the session and the ID-set hash. Is a random code (for example `K7Q2`) also necessary?
-3. **Undo window and TTL.** This page uses 24 hours for undo and 5 minutes for the confirmation TTL as examples. The values must come from the configuration (P17).
-4. **Default for charts.** Does the CLI show a bar chart by default when the data fits, or only when the Executive profile says `charts: yes`?
+These questions are decided:
+
+- **Reply text for 2–3 reports**: `delete n`, the same as for more than 3 (AC-R3.1).
+- **Confirmation code**: there is no random code. The reply text is the expected reply, and the pending confirmation is bound inside the system ([ADR 0002](../adr/0002-llm-has-no-delete-tool.md)).
+- **Undo window and TTL**: 24 hours and 5 minutes. They are starting values in the configuration (P17). See [HLD 3](hld.md#3-assumptions-and-starting-values) and [HLD 10.3](hld.md#103-rules).
+
+This question is still open:
+
+1. **Default for charts.** Does the CLI show a bar chart by default when the data fits, or only when the Executive profile says `charts: yes`?

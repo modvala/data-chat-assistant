@@ -16,71 +16,71 @@ The Design, Code, Test and Demo columns stay empty ("—") until the work exists
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-CORE.1 | The CLI agent makes BigQuery SQL at run time, keeps the conversation context and builds a report with action items when the Executive asks. | **Must** | — | — | — | — |
+| AC-CORE.1 | The CLI agent makes BigQuery SQL at run time, keeps the conversation context and builds a report with action items when the Executive asks. | **Must** | [HLD 5](design/hld.md#5-turn-api), [6](design/hld.md#6-turn-lifecycle) | — | — | — |
 
 ## R1. Hybrid Intelligence
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R1.1 | At query time, Trio retrieval finds the top-k Trios that are close to the question, and the agent puts them into the context. The Answer shows the IDs of the Trios that it used (P22). In the prototype, Trio retrieval uses embeddings only (ADR 0007). Production also filters by metric tags. | Bonus | — | — | — | — |
-| AC-R1.2 | The design shows the update loop: candidate → analyst review → tag → index (P13), with versions for Trios and a retirement of old Trios. | Design | — | — | — | — |
-| AC-R1.3 | The prototype has 2–3 Trios, made from the example questions of the assignment, and cites them in Answers. | Bonus | — | — | — | — |
+| AC-R1.1 | At query time, Trio retrieval finds the top-k Trios that are close to the question, and the agent puts them into the context. The Answer shows the IDs of the Trios that it used (P22). In the prototype, Trio retrieval uses embeddings only (ADR 0007). Production also filters by metric tags. | Bonus | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
+| AC-R1.2 | The design shows the update loop: candidate → analyst review → tag → index (P13), with versions for Trios and a retirement of old Trios. | Design | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
+| AC-R1.3 | The prototype has 2–3 Trios, made from the example questions of the assignment, and cites them in Answers. | Bonus | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
 
 ## R2. Safety & PII Masking
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R2.1 | No PII column gets to the LLM or to the output. The validator works on the SQL AST, so it also catches `SELECT *`, aliases and expressions. A scan of the output is the last layer. All red-team cases are blocked. | **Must** | — | — | — | — |
-| AC-R2.2 | Each query reads only the Effective scope, through the scoped views (ADR 0001). For a Manager, the figure of the agent equals the figure of a reference query on the brands of that Manager. A request to go out of the scope gets a refusal. | **Must** | — | — | — | — |
-| AC-R2.3 | A request that is not analysis (prompt injection, a request for the system prompt, a poem) gets a polite refusal. A demographic query goes to the threshold view with k = 5, or gets `HAVING COUNT(DISTINCT user_id) >= 5` as the fallback (ADR 0005). | **Must** | — | — | — | — |
+| AC-R2.1 | No PII column gets to the LLM or to the output. The validator works on the SQL AST, so it also catches `SELECT *`, aliases and expressions. A scan of the output is the last layer. All red-team cases are blocked. | **Must** | [HLD 8](design/hld.md#8-safety-pipeline) | — | — | — |
+| AC-R2.2 | Each query reads only the Effective scope, through the scoped views (ADR 0001). For a Manager, the figure of the agent equals the figure of a reference query on the brands of that Manager. A request to go out of the scope gets a refusal. | **Must** | [HLD 8](design/hld.md#8-safety-pipeline) | — | — | — |
+| AC-R2.3 | A request that is not analysis (prompt injection, a request for the system prompt, a poem) gets a polite refusal. A demographic query goes to the threshold view with k = 5, or gets `HAVING COUNT(DISTINCT user_id) >= 5` as the fallback (ADR 0005). | **Must** | [HLD 8](design/hld.md#8-safety-pipeline) | — | — | — |
 
 ## R3. High-Stakes Oversight
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R3.1 | A delete request shows a preview (the count and the titles of the matched Saved Reports) and a confirmation code. Nothing changes before the Executive types the code. Any other message cancels the request, and the code expires after its TTL. The LLM has no delete tool (ADR 0002). The friction grows with the blast radius: "yes" for 1 report, the count (for example `delete 7`) for more than 3 reports. | **Must** | — | — | — | — |
-| AC-R3.2 | An Executive can delete only the Saved Reports that they own. The code is bound to the Executive, the session and the hash of the exact set of report IDs. "Reports mentioning Customer X" matches on the Customer IDs that each Saved Report records. For a name, the agent asks for the Customer ID. | **Must** | — | — | — | — |
-| AC-R3.3 | The delete is soft and writes an audit log entry. The `undo` command restores the reports during an undo window. | **Must** | — | — | — | — |
+| AC-R3.1 | A delete request shows a preview (the count and the titles of the matched Saved Reports) and the expected reply. Nothing changes before the Executive types the expected reply. Any other message cancels the request, and the pending confirmation expires after its TTL. The LLM has no delete tool (ADR 0002). The friction grows with the blast radius: "yes" for 1 report, the count (for example `delete 7`) for 2 or more reports. | **Must** | [HLD 10](design/hld.md#10-destructive-operations) | — | — | — |
+| AC-R3.2 | An Executive can delete only the Saved Reports that they own. The pending confirmation is bound to the Executive, the session and the hash of the exact set of report IDs. "Reports mentioning Customer X" matches on the Customer IDs that each Saved Report records. For a name, the agent asks for the Customer ID. | **Must** | [HLD 10](design/hld.md#10-destructive-operations) | — | — | — |
+| AC-R3.3 | The delete is soft and writes an audit log entry. The `/undo` command restores the reports during the Undo window. | **Must** | [HLD 10](design/hld.md#10-destructive-operations) | — | — | — |
 
 ## R4. Continuous Improvement (Learning Loop)
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R4.1 | User level: the Executive profile learns format, depth and length from explicit requests and from implicit signals, with a confidence and a decay. The Executive can see and edit the profile. An explicit edit wins over a learned value. | Design | — | — | — | — |
-| AC-R4.2 | System level: signals (feedback, rephrased questions, SQL corrections, failed turns) become candidate Trios and candidate changes. An eval gate checks each change before release. The system never changes itself without the gate. | Design | — | — | — | — |
-| AC-R4.3 | The prototype keeps a YAML Executive profile for each Executive, shows and edits it with `/profile`, and uses it in the next session. | Bonus | — | — | — | — |
+| AC-R4.1 | User level: the Executive profile learns format, depth and length from explicit requests and from implicit signals, with a confidence and a decay. The Executive can see and edit the profile. An explicit edit wins over a learned value. | Design | [HLD 13](design/hld.md#13-learning-loop) | — | — | — |
+| AC-R4.2 | System level: signals (feedback, rephrased questions, SQL corrections, failed turns) become candidate Trios and candidate changes. An eval gate checks each change before release. The system never changes itself without the gate. | Design | [HLD 13](design/hld.md#13-learning-loop) | — | — | — |
+| AC-R4.3 | The prototype keeps a YAML Executive profile for each Executive, shows and edits it with `/profile`, and uses it in the next session. | Bonus | [HLD 13](design/hld.md#13-learning-loop) | — | — | — |
 
 ## R5. Resilience & Graceful Error Handling
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R5.1 | For a SQL error, the agent first does a dry run, then makes not more than 2 correction attempts. For an empty result, it runs a diagnostic query on the distinct values of the filter column and gives an honest Answer. The CLI does not stop. | **Must** | — | — | — | — |
-| AC-R5.2 | For 429, 5xx or a timeout from the LLM or BigQuery, the agent uses backoff, then the fallback model, then a friendly message with the `trace_id`. The session continues. Chaos mode (`CHAOS=llm_429:0.3,bq_timeout:0.1`) proves this. | **Must** | — | — | — | — |
-| AC-R5.3 | Each turn has a budget for LLM calls, tokens, bytes scanned and wall time. When a turn goes over the budget, the agent stops and explains why. | **Must** | — | — | — | — |
+| AC-R5.1 | For a SQL error, the agent first does a dry run, then makes not more than 2 correction attempts. For an empty result, it runs a diagnostic query on the distinct values of the filter column and gives an honest Answer. The CLI does not stop. | **Must** | [HLD 15](design/hld.md#15-resilience-and-error-handling) | — | — | — |
+| AC-R5.2 | For 429, 5xx or a timeout from the LLM or BigQuery, the agent uses backoff, then the fallback model, then a friendly message with the `trace_id`. The session continues. Chaos mode (`CHAOS=llm_429:0.3,bq_timeout:0.1`) proves this. | **Must** | [HLD 15](design/hld.md#15-resilience-and-error-handling) | — | — | — |
+| AC-R5.3 | Each turn has a budget for LLM calls, tokens, bytes scanned and wall time. When a turn goes over the budget, the agent stops and explains why. | **Must** | [HLD 15](design/hld.md#15-resilience-and-error-handling) | — | — | — |
 
 ## R6. Quality Assurance
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R6.1 | An eval set of 5 questions with reference SQL, separate from the Golden Bucket (ADR 0006), measures execution accuracy. CI runs it and publishes the report to the Pages site. | Bonus | — | — | — | — |
-| AC-R6.2 | An LLM judge checks intent with a rubric (does the Answer reply to the question, are the action items specific), calibrated against a small set of human labels. | Design (optional) | — | — | — | — |
-| AC-R6.3 | UX eval: a pairwise preference test, in which the Executive sees two Answer variants and selects the better one. | Design | — | — | — | — |
+| AC-R6.1 | An eval set of 5 questions with reference SQL, separate from the Golden Bucket (ADR 0006), measures execution accuracy. CI runs it and publishes the report to the Pages site. | Bonus | [HLD 17](design/hld.md#17-quality-assurance) | — | — | — |
+| AC-R6.2 | An LLM judge checks intent with a rubric (does the Answer reply to the question, are the action items specific), calibrated against a small set of human labels. | Design (optional) | [HLD 17](design/hld.md#17-quality-assurance) | — | — | — |
+| AC-R6.3 | UX eval: a pairwise preference test, in which the Executive sees two Answer variants and selects the better one. | Design | [HLD 17](design/hld.md#17-quality-assurance) | — | — | — |
 
 ## R7. Observability
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R7.1 | The CLI shows the `trace_id` of each turn. The trace has spans for LLM calls (model, tokens, latency), tools (SQL, bytes, rows) and guardrail decisions (block reason). No PII goes into a trace. | **Must** | — | — | — | — |
-| AC-R7.2 | The docs define the metrics before the code: turn success rate, block rate for each reason, self-correction rate, empty-result rate, LLM error and fallback rate, p50/p95 latency, cost for each turn, and the completion and abort rate of confirmations. Each metric comes out as a span attribute or a log field. | **Must** | — | — | — | — |
-| AC-R7.3 | The `/trace <id>` command shows the full dialog again, step by step, from the JSONL trace file. | **Must** | — | — | — | — |
+| AC-R7.1 | The CLI shows the `trace_id` of each turn. The trace has spans for LLM calls (model, tokens, latency), tools (SQL, bytes, rows) and guardrail decisions (block reason). No PII goes into a trace. | **Must** | [HLD 16](design/hld.md#16-observability) | — | — | — |
+| AC-R7.2 | The docs define the metrics before the code: turn success rate, block rate for each reason, self-correction rate, empty-result rate, LLM error and fallback rate, p50/p95 latency, cost for each turn, and the completion and abort rate of confirmations. Each metric comes out as a span attribute or a log field. | **Must** | [HLD 16](design/hld.md#16-observability) | — | — | — |
+| AC-R7.3 | The `/trace <id>` command shows the full dialog again, step by step, from the JSONL trace file. | **Must** | [HLD 16](design/hld.md#16-observability) | — | — | — |
 
 ## R8. Agility (Persona Management)
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R8.1 | The Persona is outside the code, has versions and a non-developer can edit it. The system reads it again on each turn, so a change needs no deployment. | Design | — | — | — | — |
-| AC-R8.2 | Before a Persona change goes live, the system validates it, shows a sample Answer in the new tone and permits a rollback. Each trace records the Persona version. | Design | — | — | — | — |
-| AC-R8.3 | The prototype reads `persona.yaml` on each turn. The prompt has layers: the safety layer is locked, and only the tone layer comes from the Persona. | Bonus | — | — | — | — |
+| AC-R8.1 | The Persona is outside the code, has versions and a non-developer can edit it. The system reads it again on each turn, so a change needs no deployment. | Design | [HLD 14](design/hld.md#14-persona-management) | — | — | — |
+| AC-R8.2 | Before a Persona change goes live, the system validates it, shows a sample Answer in the new tone and permits a rollback. Each trace records the Persona version. | Design | [HLD 14](design/hld.md#14-persona-management) | — | — | — |
+| AC-R8.3 | The prototype reads `persona.yaml` on each turn. The prompt has layers: the safety layer is locked, and only the tone layer comes from the Persona. | Bonus | [HLD 14](design/hld.md#14-persona-management) | — | — | — |
 
 The prompt has three layers. An upper layer wins on its own topic:
 
@@ -96,6 +96,5 @@ flowchart TB
 | ID | Item | Mark |
 | --- | --- | --- |
 | EX.1 | A result cache keyed by a hash of the normalized SQL | Bonus |
-| EX.2 | Trace export to Langfuse Cloud | Bonus |
 | EX.3 | A circuit breaker for each external service | Design |
-| EX.4 | Production observability: Cloud Trace, Logging and Monitoring, plus self-hosted Langfuse on Cloud Run | Design |
+| EX.4 | Production observability: Cloud Trace, Logging and Monitoring, and a log sink to BigQuery | Design |

@@ -15,7 +15,7 @@ This page lists the selected tools and services. The reasons for the decisions t
 | Warehouse | BigQuery, `bigquery-public-data.thelook_ecommerce`. The BigQuery sandbox is sufficient. |
 | Local stores | SQLite for Saved Reports and the audit log; YAML for the Executive profiles, `persona.yaml` and `executives.json` |
 | Configuration models | Pydantic |
-| Tracing | OpenTelemetry SDK with a JSONL exporter; Langfuse Cloud export as a bonus |
+| Tracing | OpenTelemetry SDK with a JSONL exporter. `/trace` reads the JSONL file. |
 | Tests | pytest |
 
 ## Production (GCP)
@@ -28,7 +28,7 @@ This page lists the selected tools and services. The reasons for the decisions t
 | State | Firestore: sessions, pending confirmations, Saved Reports, the audit log, Executive profiles and the Persona |
 | Golden Bucket | GCS for the raw Trios, BigQuery `VECTOR_SEARCH` for retrieval |
 | Extra guardrails | Sensitive Data Protection (DLP) and Model Armor |
-| Observability | Cloud Trace, Logging and Monitoring, a log sink to BigQuery, and self-hosted Langfuse on Cloud Run |
+| Observability | Cloud Trace, Logging and Monitoring, and a log sink to BigQuery for masked structured logs |
 | Learning loop jobs | Pub/Sub, Cloud Run Jobs and Cloud Scheduler |
 | Secrets | Secret Manager |
 

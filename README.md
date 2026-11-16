@@ -6,6 +6,8 @@ Tasks are tracked as GitHub Issues on the project board.
 
 ## Documentation
 
+- [High-level design](docs/design/hld.md): the architecture of the whole solution.
+- [CLI design](docs/design/cli.md): how the CLI shows Answers.
 - [Requirements coverage](docs/requirements-coverage.md): the acceptance criteria for each requirement.
 - [Tech stack](docs/tech-stack.md)
 - [Architecture decision records](docs/adr/)

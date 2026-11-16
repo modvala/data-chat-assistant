@@ -44,7 +44,7 @@ Use managed services for infrastructure: compute, storage, secrets and monitorin
 
 ### P6. Ports and adapters
 
-The core uses shared interfaces: `LLMClient`, `Warehouse`, `ReportStore`, `KnowledgeStore`, `Tracer`. The prototype uses local adapters. Production uses GCP adapters. Thus the system is easy to extend, and it runs on any machine.
+The core uses shared interfaces: `LLMClient`, `Warehouse`, `ReportStore`, `KnowledgeStore`, `Tracer`, `SessionStore` (conversation state and pending confirmations) and `ConfigStore` (the Persona, the Executive profiles and the access mapping). The prototype uses local adapters. Production uses GCP adapters. Thus the system is easy to extend, and it runs on any machine.
 
 The agent framework is also an adapter. The framework runs the agent loop: LLM calls, tool calls, memory and pauses for confirmation. Our own functions make all safety decisions: SQL validation, the brand scope, masking and the check of the confirmation token. These functions do not import framework types.
 
