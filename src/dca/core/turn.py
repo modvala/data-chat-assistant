@@ -2,11 +2,12 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from dca.config import Settings
 from dca.core.answer import RefusalReason
-from dca.core.ports import Grant, Tracer, Warehouse
+from dca.core.ports import Grant, ReportStore, Tracer, Warehouse
 from dca.core.state import SessionState, SqlAttempt
 
 Progress = Callable[[str, dict[str, Any]], None]
@@ -30,6 +31,12 @@ class QueryRun:
     bytes_scanned: int
     customer_columns: tuple[str, ...] = ()
     llm_sql: str = ""
+
+    @property
+    def customer_ids(self) -> list[str]:
+        """The Customer IDs in the result rows (HLD 10.5)."""
+        indexes = [self.columns.index(name) for name in self.customer_columns if name in self.columns]
+        return sorted({str(row[i]) for row in self.rows for i in indexes if row[i] is not None})
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,8 @@ class TurnContext:
     threshold: ThresholdState = field(default_factory=lambda: ThresholdState(None))
     intent: str = "analysis"
     dates: DateRange | None = None
+    reports: ReportStore | None = None
+    now: datetime = field(default_factory=lambda: datetime.now(UTC))
     queries: dict[str, QueryRun] = field(default_factory=dict)
     attempts: list[SqlAttempt] = field(default_factory=list)
 

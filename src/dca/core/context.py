@@ -26,7 +26,9 @@ Tools:
 - run_query(sql): runs one SELECT. The result has a query_id, the columns and up to 50 rows.
   If the result is an error, fix the SQL and call run_query again.
   If the result says "not permitted", stop and do not try a different query.
-- describe_schema(): returns the description of the scoped views."""
+- describe_schema(): returns the description of the scoped views.
+- save_report(title): saves the last Answer as a Saved Report, when the Executive asks to save it.
+- list_reports(): lists the Saved Reports of the Executive."""
 
 ANSWER_FORMAT = """\
 When you have the data, give the final answer as one JSON object and nothing else:

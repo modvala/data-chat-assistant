@@ -96,7 +96,15 @@ class AdkAgentLoop:
             """Return the description of the scoped views and their columns."""
             return tools.describe_schema(knowledge)
 
-        return [run_query, describe_schema]
+        def save_report(title: str, tool_context: ToolContext) -> dict:
+            """Save the last Answer of this conversation as a Saved Report. Use an empty title for the default."""
+            return tools.save_report(turn, title, _grant(tool_context.state))
+
+        def list_reports(tool_context: ToolContext) -> dict:
+            """List the Saved Reports of the Executive, with titles and dates."""
+            return tools.list_reports(turn, _grant(tool_context.state))
+
+        return [run_query, describe_schema, save_report, list_reports]
 
     async def run(
         self, turn: TurnContext, *, instruction: str, message: str, model: str, fallback_used: bool = False
