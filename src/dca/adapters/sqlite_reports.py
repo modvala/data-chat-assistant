@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 class SQLiteReportStore:
     def __init__(self, path: Path) -> None:
         self.path = path
+        path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(SCHEMA)
 

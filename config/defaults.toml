@@ -5,10 +5,11 @@ model = "gemini-3.8-flash"
 fallback_model = "gemini-3.5-flash-lite"
 persona_version = "builtin-1"
 
+# The runtime files go to one folder. The Docker setup (#40) mounts it from the host.
 [paths]
 executives = "executives.json"
-reports_db = "dca_reports.sqlite"
-trace_file = "dca_traces.jsonl"
+reports_db = "data/dca_reports.sqlite"
+trace_file = "data/dca_traces.jsonl"
 
 [warehouse]
 source_dataset = "bigquery-public-data.thelook_ecommerce"
