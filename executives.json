@@ -1,0 +1,7 @@
+{
+  "executives": [
+    {"id": "ceo", "role": "ceo"},
+    {"id": "mgr_ana", "role": "manager", "brands": ["Allegra K", "Calvin Klein"]},
+    {"id": "mgr_ben", "role": "manager", "brands": ["Levi's", "Carhartt", "Columbia", "Quiksilver", "Volcom"]}
+  ]
+}

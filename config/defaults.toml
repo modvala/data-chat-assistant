@@ -1,0 +1,56 @@
+# Starting values of the prototype (P17). The IDs (V7, A8 ...) refer to HLD section 3.
+# An environment variable or .env overrides a value: DCA_<SECTION>__<KEY>, for example DCA_BUDGET__LLM_CALLS=4.
+
+model = "gemini-3.8-flash"
+fallback_model = "gemini-3.5-flash-lite"
+persona_version = "builtin-1"
+
+[paths]
+executives = "executives.json"
+reports_db = "dca_reports.sqlite"
+trace_file = "dca_traces.jsonl"
+
+[warehouse]
+source_dataset = "bigquery-public-data.thelook_ecommerce"
+threshold_dataset = "dca_views"
+threshold_k = 5
+
+# V7
+[budget]
+llm_calls = 8
+llm_tokens = 60000
+query_bytes = 1_000_000_000
+turn_bytes = 2_000_000_000
+wall_time_s = 90
+corrections = 2
+
+# V8
+[retry]
+llm_retries = 2
+bq_retries = 1
+backoff_min_s = 1.0
+backoff_max_s = 8.0
+
+# V9
+[timeout]
+llm_call_s = 30
+bq_job_s = 60
+request_s = 120
+
+[confirmation]
+ttl_s = 300          # V11
+undo_window_h = 24   # A8
+
+# V18, V19, V20 and cli.md C6
+[limits]
+rows_to_llm = 50
+sql_limit = 50
+table_rows_shown = 20
+trace_rows = 20
+conversation_tokens = 6000
+schema_tokens = 2000
+input_max_chars = 2000
+
+[display]
+header_max_brands = 3
+preview_max_items = 5
