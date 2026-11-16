@@ -4,13 +4,15 @@
 | --- | --- |
 | describe_schema | read |
 | run_query | read, with the SQL guard |
+| save_report | write-own |
+| list_reports | read-own |
 """
 
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from dca.core import demographic, sql_guard
+from dca.core import demographic, reports, sql_guard
 from dca.core.ports import Grant, KnowledgeStore, WarehouseError
 from dca.core.state import SqlAttempt
 from dca.core.turn import QueryRun, TurnContext, TurnStop
@@ -18,6 +20,23 @@ from dca.core.turn import QueryRun, TurnContext, TurnStop
 
 def describe_schema(knowledge: KnowledgeStore) -> dict[str, Any]:
     return {"schema": knowledge.schema()}
+
+
+def save_report(turn: TurnContext, title: str, grant: Grant) -> dict[str, Any]:
+    """Saves the last Answer. The owner is the Executive of the Turn, never a value from the LLM."""
+    assert turn.reports is not None
+    report = reports.save(
+        turn.session, owner_id=grant.executive_id, title=title, reports=turn.reports, tracer=turn.tracer, now=turn.now
+    )
+    if report is None:
+        return {"error": "There is no earlier Answer to save."}
+    return {"saved": True, "title": report.title}
+
+
+def list_reports(turn: TurnContext, grant: Grant) -> dict[str, Any]:
+    assert turn.reports is not None
+    own = turn.reports.find(grant.executive_id)
+    return {"reports": [{"title": r.title, "created": r.created_at.date().isoformat()} for r in own]}
 
 
 def _guard(turn: TurnContext, sql: str, grant: Grant) -> sql_guard.Verdict:

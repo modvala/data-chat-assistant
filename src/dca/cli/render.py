@@ -72,6 +72,8 @@ COMMANDS = [
     ("/help", "Show the commands."),
     ("/scope", "Show your Brand scope."),
     ("/sql", "Show the SQL of the last Answer."),
+    ("/save [title]", "Save the last Answer as a Saved Report."),
+    ("/list", "List your Saved Reports."),
     ("/exit", "End the session."),
 ]
 
@@ -195,7 +197,8 @@ class Renderer:
                 self.refusal(block, answer.provenance.trace_id)
             else:
                 self.notice(block)
-        if content and answer.kind == "answer" and answer.provenance.trace_id:
+        scoped = answer.provenance.brand_scope or answer.provenance.all_brands
+        if content and answer.kind == "answer" and answer.provenance.trace_id and scoped:
             self.provenance(answer.provenance, report=answer.report)
 
     def _content(self, blocks: list, provenance: Provenance) -> None:

@@ -8,6 +8,7 @@ import pytest
 
 from dca.adapters.local_stores import InMemorySessionStore, JsonConfigStore, SchemaKnowledgeStore
 from dca.adapters.otel_tracer import JsonlTracer
+from dca.adapters.sqlite_reports import SQLiteReportStore
 from dca.agent.adk_loop import AdkAgentLoop
 from dca.app.turn_api import TurnAPI
 from dca.config import ROOT, Settings
@@ -85,6 +86,7 @@ def make_api(settings: Settings, warehouse: FakeWarehouse) -> Callable[..., Turn
             knowledge=knowledge,
             llm=llm,
             agent_loop=AdkAgentLoop(llm.adk_model, knowledge),
+            report_store=SQLiteReportStore(Path(used.paths.reports_db)),
         )
 
     return build

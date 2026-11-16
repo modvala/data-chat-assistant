@@ -14,9 +14,19 @@ from typing import Any
 import sqlglot
 
 from dca.config import Settings
-from dca.core import context, drafting, input_guard, messages
+from dca.core import context, drafting, input_guard, messages, reports
 from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, SqlView, Text
-from dca.core.ports import ConfigStore, Grant, KnowledgeStore, LLMClient, Role, SessionStore, Tracer, Warehouse
+from dca.core.ports import (
+    ConfigStore,
+    Grant,
+    KnowledgeStore,
+    LLMClient,
+    ReportStore,
+    Role,
+    SessionStore,
+    Tracer,
+    Warehouse,
+)
 from dca.core.demographic import THRESHOLD_VIEW
 from dca.core.state import QueryHandle, SessionState, TurnRecord
 from dca.core.turn import DateRange, ThresholdState, TurnContext, TurnStop
@@ -84,6 +94,7 @@ class TurnAPI:
         knowledge: KnowledgeStore,
         llm: LLMClient,
         agent_loop: Any,
+        report_store: ReportStore,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.settings = settings
@@ -94,6 +105,7 @@ class TurnAPI:
         self.knowledge = knowledge
         self.llm = llm
         self.agent_loop = agent_loop
+        self.reports = report_store
         self.clock = clock
         self._dates: DateRange | None = None
         self.access = AccessResolver(config_store, warehouse, settings)
@@ -133,6 +145,8 @@ class TurnAPI:
                     tracer=self.tracer,
                     progress=progress,
                     threshold=self.threshold,
+                    reports=self.reports,
+                    now=self.clock(),
                 )
                 progress("thinking", {})
                 decision = self._input_guard(text)
@@ -162,7 +176,12 @@ class TurnAPI:
         state = self._load(session_id)
         with self.tracer.span("command", command=name):
             trace_id = self.tracer.current_trace_id()
-            handler = {"scope": self._cmd_scope, "sql": self._cmd_sql}.get(name)
+            handler = {
+                "scope": self._cmd_scope,
+                "sql": self._cmd_sql,
+                "save": self._cmd_save,
+                "list": self._cmd_list,
+            }.get(name)
             if handler is None:
                 blocks: list = [Notice(level="info", title="Unknown command", body="Type /help to see the commands.")]
                 return Answer(kind="notice", blocks=blocks, provenance=Provenance(trace_id=trace_id))
@@ -271,6 +290,7 @@ class TurnAPI:
                         columns=query.columns,
                         row_count=len(query.rows),
                         bytes_scanned=query.bytes_scanned,
+                        customer_ids=query.customer_ids,
                     )
                 )
             state.last_attempts = turn.attempts
@@ -302,6 +322,15 @@ class TurnAPI:
             pretty = sqlglot.transpile(handle.sql, read="bigquery", write="bigquery", pretty=True)[0]
             blocks.append(SqlView(sql=pretty, bytes_scanned=handle.bytes_scanned, row_count=handle.row_count))
         return Answer(kind="answer", blocks=blocks)
+
+    def _cmd_save(self, state: SessionState, args: str) -> Answer:
+        report = reports.save(
+            state, owner_id=state.executive_id, title=args, reports=self.reports, tracer=self.tracer, now=self.clock()
+        )
+        return reports.saved_notice(report)
+
+    def _cmd_list(self, state: SessionState, _args: str) -> Answer:
+        return reports.list_answer(self.reports.find(state.executive_id))
 
     def _cmd_scope(self, state: SessionState, _args: str) -> Answer:
         entry = self.config.access(state.executive_id)
