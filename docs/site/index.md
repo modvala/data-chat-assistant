@@ -101,7 +101,7 @@ flowchart TB
 
 **Available now**
 
-A failed query gets a fix, and an empty result gets a reason, such as `Did you mean …?` for a typo. When a service fails, the agent tries again or uses a backup model, and your session continues. Each question has a budget of model calls, data and time, `Ctrl+C` stops a question, and chaos mode adds failures for a test.
+A failed query gets a fix, and an empty result gets a reason, such as `Did you mean …?` for a value that has a typo. A long analysis gets an Answer from the data that the agent found, and a failed service gets a retry or a backup model. Each question has a budget of model calls, data and time, `Ctrl+C` stops only the question, and chaos mode adds failures for a test.
 
 [See it in the demo](demo-tour.md#d9-service-failures)
 

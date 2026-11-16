@@ -88,6 +88,24 @@ def test_ac_r5_2_main_model_failure_gives_an_answer_from_the_backup_model(
     assert "backup model" in capsys.readouterr().out
 
 
+def test_ac_r5_2_backup_model_after_a_query_uses_new_bigquery_job_ids(
+    make_api: Callable[..., TurnAPI], settings: Settings, warehouse: FakeWarehouse
+) -> None:
+    # Live run, trace 0452609f: the main model ran a query, then failed. The backup model ran the
+    # query again with the same job ID, and BigQuery returned 409 Conflict.
+    warehouse.on("sale_price", columns=["revenue"], rows=[[10.0]])
+    llm = ScriptedLLM(
+        call("run_query", sql=SQL), fail(429), fail(429), fail(429),
+        call("run_query", sql=SQL), answer({"type": "table", "query_id": "q1"}),
+    )
+
+    result = ask(make_api(llm))
+
+    assert result.kind == "answer" and result.provenance.fallback_used
+    jobs = [run.job_id for run in warehouse.queries]
+    assert len(jobs) == 2 and len(set(jobs)) == 2
+
+
 def test_ac_r5_2_all_retries_and_the_backup_model_fail_gives_a_friendly_error(make_api: Callable[..., TurnAPI]) -> None:
     llm = ScriptedLLM()
     llm.always_fail = 503

@@ -296,7 +296,10 @@ class TurnAPI:
                 try:
                     if turn.budget:
                         turn.budget.before_llm_call()
-                    intent, tokens = self._classify(text, progress)
+                    # Only answered Turns: a refused message does not come back (HLD 9.4).
+                    earlier = [r.message for r in turn.session.turns if r.outcome == "answered"]
+                    earlier = earlier[max(0, len(earlier) - self.settings.limits.classifier_questions) :]
+                    intent, tokens = self._classify(text, earlier, progress)
                     span.set("tokens", tokens)
                     if turn.budget:
                         turn.budget.add_tokens(tokens)
@@ -309,12 +312,12 @@ class TurnAPI:
             span.set("reason", decision.reason)
         return decision
 
-    def _classify(self, text: str, progress: ProgressCallback) -> tuple[str, int]:
+    def _classify(self, text: str, earlier: list[str], progress: ProgressCallback) -> tuple[str, int]:
         """The classifier call with backoff for a 429, a 5xx or a timeout (V8)."""
         retry = self.settings.retry
         for attempt in range(retry.llm_retries + 1):
             try:
-                return input_guard.classify(self.llm, text, model=self.settings.fallback_model)
+                return input_guard.classify(self.llm, text, model=self.settings.fallback_model, earlier=earlier)
             except LLMTransientError as error:
                 if attempt == retry.llm_retries:
                     raise
@@ -378,6 +381,7 @@ class TurnAPI:
                 self.tracer.log("llm.fallback", model=model)
                 turn.queries.clear()
                 turn.attempts.clear()
+                turn.run = 2  # BigQuery rejects a job ID that it has seen.
             try:
                 final = self._run_agent(
                     turn,
@@ -394,8 +398,31 @@ class TurnAPI:
             except TurnFinish as finish:
                 turn.stop_limit = finish.stop_limit
                 return finish.answer, finish.outcome
+        if drafting.is_broken_json(final):
+            final = self._repair_json(turn, final)
         answer = drafting.answer_from_draft(final, turn, model=model, fallback_used=fallback_used)
         return answer, "refused" if any(isinstance(block, Refusal) for block in answer.blocks) else "answered"
+
+    def _repair_json(self, turn: TurnContext, text: str) -> str:
+        """One call on the fallback model, with structured output, fixes the syntax of the draft.
+
+        A failure or a used budget keeps the draft, and `parse_draft` then shows no raw JSON.
+        """
+        with self.tracer.span("answer.repair") as span:
+            try:
+                if turn.budget:
+                    turn.budget.before_llm_call()
+                result = self.llm.generate(
+                    text, model=self.settings.fallback_model, system=drafting.REPAIR_SYSTEM, json_schema=drafting.DRAFT_SCHEMA
+                )
+                if turn.budget:
+                    turn.budget.add_tokens(result.tokens_in + result.tokens_out)
+            except Exception as error:  # noqa: BLE001 - the repair is best effort
+                span.set("error", type(error).__name__)
+                span.set("repaired", False)
+                return text
+            span.set("repaired", not drafting.is_broken_json(result.text))
+            return result.text
 
     def _run_agent(self, turn: TurnContext, coroutine: Any) -> str:
         """Runs the Agent loop inside the rest of the wall-time budget. Ctrl+C cancels the task."""

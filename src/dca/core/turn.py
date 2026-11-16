@@ -90,6 +90,7 @@ class TurnContext:
     cancelled: bool = False
     running_job: str | None = None
     stop_limit: str | None = None  # the budget limit that stopped the Turn, for the trace
+    run: int = 1  # 1 for the main model, 2 for the fallback model. Each BigQuery job ID has it.
 
     def check_cancel(self) -> None:
         if self.cancelled:

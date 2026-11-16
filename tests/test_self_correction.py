@@ -14,7 +14,7 @@ from dca.cli.render import THEME, Mode, Renderer
 from dca.config import Settings
 from dca.core.answer import Notice, Refusal, SqlView
 from tests.conftest import read_jsonl
-from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call
+from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call, tool_results
 
 # The SQL guard passes it. BigQuery fails it in the dry run: a STRING compared with an INT64.
 BAD_SQL = "SELECT SUM(sale_price) AS revenue FROM scoped_order_items WHERE status = 1"
@@ -233,3 +233,45 @@ def test_ac_r2_3_far_value_on_a_demographic_route_is_a_threshold_refusal_not_a_g
     result = api.send_message(api.start_session("mgr_ana").session_id, "Average spend by age in Boston?")
 
     assert isinstance(result.blocks[0], Refusal) and result.blocks[0].reason == "threshold"
+
+
+def test_ac_r5_1_used_corrections_after_a_result_give_an_answer_from_the_results(
+    make_api: Callable[..., TurnAPI], warehouse: FakeWarehouse, settings: Settings
+) -> None:
+    # Live run, trace fdf47c5a: two queries returned rows, then 3 failed queries ended the Turn with
+    # an error notice, and the Executive got none of the results.
+    warehouse.on("= 1", dry_error=TYPE_ERROR)
+    warehouse.on("Complete", columns=["revenue"], rows=[[10.0]])
+    llm = ScriptedLLM(
+        call("run_query", sql=GOOD_SQL),
+        *[call("run_query", sql=BAD_SQL) for _ in range(3)],
+        lambda request: answer({"type": "table", "query_id": "q1"}) if "stop" in tool_results(request)[-1] else call("run_query", sql=BAD_SQL),
+    )
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Why is the revenue of complete orders low?")
+
+    assert result.kind == "answer" and result.provenance.corrections == 3
+    assert len(warehouse.dry_runs) == 1 + 3
+    assert spans(settings, "turn")[-1]["attributes"]["turn.outcome"] == "answered"
+
+
+def test_ac_r5_3_last_llm_call_is_kept_for_the_answer_when_the_turn_has_results(
+    make_api: Callable[..., TurnAPI], make_settings: Callable[..., Settings], warehouse: FakeWarehouse
+) -> None:
+    # Live run, trace f6218d1d: 4 queries returned rows, then the LLM call limit stopped the Turn
+    # with a refusal `budget`, and the Executive got none of the results.
+    warehouse.on("Complete", columns=["revenue"], rows=[[10.0]])
+    settings = make_settings(budget={"llm_calls": 4})
+    llm = ScriptedLLM(
+        call("run_query", sql=GOOD_SQL),
+        call("run_query", sql=GOOD_SQL),
+        lambda request: answer({"type": "table", "query_id": "q2"}) if "stop" in tool_results(request)[-1] else call("run_query", sql=GOOD_SQL),
+    )
+    api = make_api(llm, settings_=settings)
+    session = api.start_session("mgr_ana")
+
+    result = api.send_message(session.session_id, "Why did the revenue of complete orders change?")
+
+    assert result.kind == "answer" and len(warehouse.queries) == 2

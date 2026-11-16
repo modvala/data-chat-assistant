@@ -7,6 +7,7 @@ import pytest
 
 from dca.app.turn_api import TurnAPI
 from dca.config import Settings
+from dca.core import input_guard
 from dca.core.answer import Answer, Bullets, Refusal, Text
 from tests.conftest import read_jsonl
 from tests.fakes import FakeWarehouse, ScriptedLLM, answer
@@ -105,3 +106,25 @@ def test_ac_r2_3_classifier_failure_does_not_block_the_turn(
 
     assert result.kind == "answer"
     assert input_span(settings)["reason"] == "classifier_unavailable"
+
+
+def test_ac_core_1_classifier_gets_the_earlier_questions_for_a_follow_up(make_api: Callable[..., TurnAPI]) -> None:
+    # Live run, trace ea72f39d: "Can you explain that in more detail?" got a refusal `not_analysis`,
+    # because the classifier saw only the new message.
+    llm = ScriptedLLM(answer({"type": "text", "markdown": "Customer 4521 spent the most."}))
+    api = make_api(llm)
+    session = api.start_session("mgr_ana")
+    api.send_message(session.session_id, "Who are my top 5 Customers by total spend?")
+    llm.intent = "other"
+    api.send_message(session.session_id, "Write a poem about my sales")
+
+    api.send_message(session.session_id, "Can you explain that in more detail?")
+
+    prompt = llm.classifier_calls[-1][1]
+    assert "Who are my top 5 Customers by total spend?" in prompt
+    assert "poem" not in prompt  # A refused Turn does not come back into the context.
+    assert prompt.rstrip().endswith("Can you explain that in more detail?")
+
+
+def test_ac_core_1_classifier_prompt_counts_a_follow_up_as_analysis() -> None:
+    assert "follow-up" in input_guard.CLASSIFIER_SYSTEM

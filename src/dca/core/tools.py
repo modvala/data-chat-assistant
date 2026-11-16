@@ -24,6 +24,13 @@ from dca.core.turn import QueryRun, TurnCancelled, TurnContext, TurnFinish, Turn
 
 T = TypeVar("T")
 
+# A Turn that has results, and has used its corrections or has one LLM call left, writes the
+# Answer from those results. It does not end with no data (HLD 15.4).
+STOP_TEXT = (
+    "No more queries for this question. Write the final answer now, only from the results that you have. "
+    "Tell the Executive which part of the question the results do not answer."
+)
+
 
 def describe_schema(knowledge: KnowledgeStore) -> dict[str, Any]:
     return {"schema": knowledge.schema()}
@@ -110,6 +117,9 @@ def _fail(turn: TurnContext, attempt: SqlAttempt, error: str, llm_text: str) -> 
     """Records a failed attempt. After the last correction, the Turn ends with an error notice."""
     attempt.error = error
     if failed_attempts(turn) > turn.settings.budget.corrections:
+        if turn.queries:
+            turn.tracer.log("sql.corrections_used", attempts=len(turn.attempts), answer_from_results=True)
+            return {"stop": STOP_TEXT}
         notice = Notice(
             level="error",
             title="I could not make a working query",
@@ -122,6 +132,16 @@ def _fail(turn: TurnContext, attempt: SqlAttempt, error: str, llm_text: str) -> 
 
 
 def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
+    if turn.queries and failed_attempts(turn) > turn.settings.budget.corrections:
+        return {"stop": STOP_TEXT}
+    result = _run_query(turn, sql, grant)
+    if turn.queries and turn.budget and turn.budget.llm_calls_left() <= 1 and "stop" not in result:
+        turn.tracer.log("budget.last_llm_call")
+        result = {**result, "stop": STOP_TEXT}
+    return result
+
+
+def _run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
     settings = turn.settings
     turn.check_cancel()
     failures = failed_attempts(turn)
@@ -173,7 +193,7 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
                         timeout_s=settings.timeout.bq_job_s,
                         job_id=job_id,
                     ),
-                    f"dca-{turn.trace_id}-{query_id}-{len(turn.attempts)}",
+                    f"dca-{turn.trace_id}-{turn.run}-{query_id}-{len(turn.attempts)}",
                 )
             except WarehouseError as error:
                 span.set("error", str(error))
@@ -272,7 +292,7 @@ def _diagnostic_values(turn: TurnContext, grant: Grant, sql: str, step: str) -> 
             verdict.params,
             max_bytes=turn.settings.budget.query_bytes,
             timeout_s=turn.settings.timeout.bq_job_s,
-            job_id=f"dca-diag-{turn.trace_id}-{len(turn.attempts)}-{step}",
+            job_id=f"dca-diag-{turn.trace_id}-{turn.run}-{len(turn.attempts)}-{step}",
         )
     except (WarehouseError, WarehouseTransientError):
         return []

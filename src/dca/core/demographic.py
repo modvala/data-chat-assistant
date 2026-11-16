@@ -35,6 +35,22 @@ _THRESHOLD_COLUMNS = {
 }
 
 
+def rules_text() -> str:
+    """The supported shape for the LLM instruction. The columns come from the router itself."""
+    columns: dict[str, list[str]] = {}
+    for view, column in _THRESHOLD_COLUMNS:
+        columns.setdefault(view, []).append(column)
+    allowed = "\n".join(f"  {view}: {', '.join(names)}" for view, names in columns.items())
+    return (
+        "A query that uses age, gender, state or city must have this shape, or the system blocks it:\n"
+        "- One SELECT with GROUP BY. No CTE, UNION or subquery.\n"
+        "- FROM scoped_customers, optionally JOIN scoped_order_items ON scoped_customers.id = scoped_order_items.user_id.\n"
+        "- Only these columns:\n" + allowed + "\n"
+        "- No Customer ID in the output or in GROUP BY. Count Customers with COUNT(DISTINCT scoped_customers.id).\n"
+        "- The system hides groups with fewer than 5 Customers. For a comparison, run one query for each part."
+    )
+
+
 @dataclass(frozen=True)
 class Shape:
     sources: dict[str, str]  # table alias -> scoped view name
