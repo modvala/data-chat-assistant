@@ -29,7 +29,7 @@ Do a bonus feature only when it is cheap and only after the required features ar
 
 ### P3. Mock what is missing, and say so
 
-We create our own Golden Bucket, report library and manager-to-brand mapping. The customer decisions about access, PII and tools are in [client decisions](requirements/2026-11-12-client-decisions.md). Write all other assumptions in the README.
+We create our own report library and manager-to-brand mapping. The Golden Bucket is a bonus (P2), and the prototype does not have it. The customer decisions about access, PII and tools are in [client decisions](requirements/2026-11-12-client-decisions.md). Write all other assumptions in the README.
 
 ## Architecture
 
@@ -44,9 +44,9 @@ Use managed services for infrastructure: compute, storage, secrets and monitorin
 
 ### P6. Ports and adapters
 
-The core uses shared interfaces: `LLMClient`, `Warehouse`, `ReportStore`, `KnowledgeStore`, `Tracer`, `SessionStore` (conversation state and pending confirmations) and `ConfigStore` (the Persona, the Executive profiles and the access mapping). The prototype uses local adapters. Production uses GCP adapters. Thus the system is easy to extend, and it runs on any machine.
+The core uses shared interfaces: `LLMClient`, `Warehouse`, `ReportStore`, `KnowledgeStore`, `Tracer`, `SessionStore` (conversation state and pending confirmations) and `ConfigStore` (the access mapping; in the design, also the Persona and the Executive profiles). The prototype uses local adapters. Production uses GCP adapters. Thus the system is easy to extend, and it runs on any machine.
 
-The agent framework is also an adapter. The framework runs the agent loop: LLM calls, tool calls, memory and pauses for confirmation. Our own functions make all safety decisions: SQL validation, the brand scope, masking and the check of the confirmation token. These functions do not import framework types.
+The agent framework is also an adapter. The framework runs the agent loop: LLM calls, tool calls and memory. Our own functions make all safety decisions: SQL validation, the brand scope, masking and the check of the confirmation reply. These functions do not import framework types.
 
 ### P7. Gemini is the default LLM
 
@@ -68,8 +68,8 @@ sequenceDiagram
     participant S as Session store
     U->>I1: Request to delete reports
     I1->>S: Save the pending confirmation
-    I1->>U: Preview and confirmation token
-    U->>I2: Confirmation with the token
+    I1->>U: Preview and expected reply
+    U->>I2: Expected reply
     I2->>S: Load the session and the pending confirmation
     I2->>U: Result
 ```
@@ -137,9 +137,9 @@ sequenceDiagram
     participant User
     participant Store
     LLM->>Code: Plan of the action
-    Code->>User: Preview and confirmation token
-    User->>Code: Explicit confirmation with the token
-    Code->>Code: Check that the user owns the token
+    Code->>User: Preview and expected reply
+    User->>Code: Expected reply
+    Code->>Code: Check the Executive, the session and the hash of the report IDs
     Code->>Store: Soft delete
     Code->>Store: Write the audit log entry
 ```
@@ -204,7 +204,7 @@ The persona, the instructions and the access rights are in external files. The s
 Each of the four required features (P1) has automated tests. Examples:
 
 - Safety: a red-team set of questions that try to get PII, data of other brands or answers that are not analysis.
-- Confirmation: a delete without a valid token does nothing, and a user cannot delete the reports of a different user.
+- Confirmation: a delete without the exact expected reply does nothing, and a user cannot delete the reports of a different user.
 
 ## Documentation and delivery
 
@@ -226,7 +226,7 @@ Each of the four required features (P1) has automated tests. Examples:
 
 - `docs/` holds all documentation. The detailed docs are for engineers and agents. They are read on github.com.
 - `docs/site/` holds the simple docs for quick readers and Executives. A GitHub Action publishes only `docs/site/` to GitHub Pages.
-- The `sync-simple-docs` skill writes `docs/site/`. The overview and Key decisions are derived. They own no numbers, values or rules, and they agree with the HLD and the ADRs. Get started and the Executive guide own the install steps and the CLI commands.
+- The `sync-simple-docs` skill writes `docs/site/`. Home, How it works and Key decisions are derived. They own no numbers, values or rules, and they agree with the HLD and the ADRs. Get started, the Executive guide and the Demo tour own the install steps, the CLI commands and the demo scenarios.
 - Each page must read correctly on github.com.
 - Do not copy content between the README, the detailed docs and the simple docs. Use links.
 
@@ -236,7 +236,8 @@ A coverage table maps each requirement of the assignment to a design section, th
 
 ## Exceptions
 
-Record each approved deviation from a principle here. There are no exceptions at this time.
+Record each approved deviation from a principle here.
 
 | Date | Principle | What changed | Why | Approved in |
 | --- | --- | --- | --- | --- |
+| 2026-11-16 | P17 | The prototype keeps the Persona (the tone) and the instructions in code (`src/dca/core/context.py`). Only the access mapping (`executives.json`) is an external file. The system reads it again on each call. | `persona.yaml` is a bonus (P2, AC-R8.3) that is not done. | Chat with the user, 2026-11-16 |

@@ -1,6 +1,6 @@
 # Executive guide
 
-**Status:** the commands and the options agree with `/help` and `--help` of the CLI on `main`. Most example questions come from the [Demo tour](demo-tour.md), which was tested on the real CLI. These examples were not run: the Texas and California question, the churn question, the Q1 report and `/scope`.
+**Status:** the commands and the options agree with `/help` and `--help` of the CLI on `main`. Most example questions come from the [Demo tour](demo-tour.md), which was tested on the real CLI. These examples were not run: the Texas and California question, the churn question, the Q1 report, the request to explain the last Answer, and `/scope`.
 
 This guide is for Executives: the brand managers and the CEO who chat with the agent. You ask a question about the sales data in plain words. The agent gives an Answer: a reply with analysis, in the chat. You do not install anything. In the prototype, an engineer does the setup in [Get started](get-started.md).
 
@@ -249,6 +249,7 @@ Sometimes the agent cannot write the text of the Answer after its queries ran. T
 ```text
 ▌ ! I could not write the analysis
 ▌ Here are the results of the queries. Ask again for the analysis.
+▌ trace <id>
 ```
 
 To stop a question while the agent works, press `Ctrl+C`. You see `Cancelled`, and the prompt comes back. At the prompt, `Ctrl+C` ends the session.

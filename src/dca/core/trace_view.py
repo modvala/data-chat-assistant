@@ -1,7 +1,7 @@
 """The C15 trace view (cli.md, HLD 16.1): the span tree of one Turn, from the trace records.
 
-Only these spans get a row. `context.assemble`, `tool.run_query` and `bq.dry_run` are parent or
-detail spans with no row of their own.
+`_row` selects the spans that get a row. `context.assemble` and `tool.run_query` are parent spans
+with no row of their own. `bq.dry_run` gets a row only when it has an error.
 """
 
 from datetime import datetime

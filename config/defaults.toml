@@ -36,7 +36,6 @@ backoff_max_s = 8.0
 [timeout]
 llm_call_s = 30
 bq_job_s = 60
-request_s = 120
 
 [confirmation]
 ttl_s = 300          # V11
@@ -49,7 +48,6 @@ sql_limit = 50
 table_rows_shown = 20
 trace_rows = 20
 conversation_tokens = 6000
-schema_tokens = 2000
 input_max_chars = 2000
 classifier_questions = 3  # earlier questions that the intent classifier gets, for a follow-up
 

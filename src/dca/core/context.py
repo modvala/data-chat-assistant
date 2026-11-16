@@ -1,7 +1,7 @@
 """The context assembler (HLD 9). It builds the LLM instruction from the loaded state.
 
 The safety layer and the tool rules are locked in code. The tone is fixed and built in
-(no `persona.yaml` in the Must scope); the trace records `persona_version`.
+(the prototype has no `persona.yaml`); the trace records `persona_version`.
 """
 
 from dca.core import demographic

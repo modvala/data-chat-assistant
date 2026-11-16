@@ -2,7 +2,7 @@
 
 Scope: both
 
-Trios are never eval cases. When the agent retrieves a Trio that is also the eval question, it finds the correct answer by retrieval, and the score is not honest. So the eval set is a separate hold-out set: 5 questions with reference SQL in the prototype, and a larger set behind the CI eval gate in production. Red-team cases are pytest tests (P23), not part of the eval set.
+Trios are never eval cases. When the agent retrieves a Trio that is also the eval question, it finds the correct answer by retrieval, and the score is not honest. So the eval set is a separate hold-out set. The prototype target is 5 questions with reference SQL (AC-R6.1, a Bonus that is not done). Production has a larger set behind the CI eval gate. Red-team cases are pytest tests (P23), not part of the eval set.
 
 ## Considered options
 

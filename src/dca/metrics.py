@@ -1,6 +1,6 @@
 """The agent metrics of HLD 16.2, from the JSONL trace file (AC-R7.2).
 
-Each metric comes from a span attribute or a log field. No metric needs extra code in the Turn.
+Each metric comes from a span attribute or a log field in the trace file.
 
     uv run dca-metrics [data/dca_traces.jsonl]
 """

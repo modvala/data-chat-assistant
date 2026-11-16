@@ -31,6 +31,6 @@ These are our assumptions in addition to the [client decisions](docs/requirement
 - The prototype has no Metric catalog (the industry name is "semantic layer"). The LLM interprets terms such as "churn" from the schema description ([ADR 0007](docs/adr/0007-no-metric-catalog-in-prototype.md)). The Golden Bucket and Trio retrieval are bonus features and are not in the prototype.
 - A row list of Customers that shows age, gender, state or city gets a refusal `pii`, also with no filter on these columns. A demographic aggregate is permitted.
 - The conversation context keeps the earlier answered Turns in full and a handle for each earlier query, within 6 k tokens. There is no LLM summary of older Turns. A refused Turn does not come back into the context.
-- After the second failed SQL correction, the Executive gets an error notice, not a refusal `budget`. The trace records it as a budget stop.
+- After the second failed SQL correction, the Executive gets an error notice, not a refusal `budget`. When an earlier query of the Turn returned rows, the Executive gets an Answer from those rows. The trace records a budget stop.
 - When the intent classifier fails, the message goes on as an analysis question. The SQL guard and the Output guard still check each query and each Answer.
 - The prices for the "cost for each Turn" metric are starting values in the configuration, not quotes.

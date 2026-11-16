@@ -32,11 +32,11 @@ You get an Answer like this:
 │                                                                            │
 │ Action items                                                               │
 │                                                                            │
-│ 1. Restock the top 10 Ridgeway jackets before Q3 (owner: buying team)      │
+│ 1. Restock the top 10 Ridgeway jackets before Q3                           │
 │    Watch: sell-through of Ridgeway jackets                                 │
-│ 2. Send a win-back offer to lapsed Lunara buyers (owner: CRM team)         │
+│ 2. Send a win-back offer to lapsed Lunara buyers                           │
 │    Watch: Lunara repeat purchase rate                                      │
-│ 3. Add the size guide to all Lunara product pages (owner: web team)        │
+│ 3. Add the size guide to all Lunara product pages                          │
 │    Watch: return rate                                                      │
 ╰────────────────────────────────────────────────────────────────────────────╯
   Scope: Ridgeway, Lunara · trace 7f3a9c2e · /sql · /save
@@ -198,7 +198,7 @@ The main design ideas:
 - **No raw personal data for the language model:** the agent never selects names, email addresses or street addresses, so the model cannot see them.
 - **The language model only plans a delete:** our code shows the preview, reads your reply and does the delete.
 - **One core for the prototype and for production:** the core uses each service through an adapter, so it runs on your computer and on Google Cloud.
-- **Configuration, not code:** the Persona, the instructions and the access rights are in files, so a change needs no new release.
+- **Configuration, not code:** the access rights, the models, the budgets and the limits are in files, so a change needs no new release. A Persona file is **Coming next**.
 
 ## CLI design
 

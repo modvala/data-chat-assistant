@@ -1,17 +1,17 @@
-# Google ADK is the agent framework, with a spike first
+# Google ADK is the agent framework, after a spike
 
 Scope: both
 
-We use Google ADK (`google-adk`) to run the agent loop. It is made for Gemini and GCP, and it gives callbacks before each tool call (a place for our guardrails), session services for a stateless service (P21), built-in OpenTelemetry and `adk eval`. We have no earlier experience with ADK. Our experience is with LangChain, and its concepts map almost one-to-one to ADK. To control this risk, ADK is only a thin adapter (P6). All safety logic is plain Python with no ADK imports.
+We use Google ADK (`google-adk`) to run the agent loop. It is made for Gemini and GCP, and it gives callbacks before each tool call (a place for our guardrails), session services for a stateless service (P21), built-in OpenTelemetry and `adk eval`. Before this project, we had no experience with ADK. Our experience is with LangChain, and its concepts map almost one-to-one to ADK. To control this risk, ADK is only a thin adapter (P6). All safety logic is plain Python with no ADK imports.
 
-Before we commit to ADK, a time-boxed spike of 1–2 hours must pass these checks:
+Before we selected ADK, a time-boxed spike of 1–2 hours checked these points:
 
 1. A `before_tool_callback` blocks a query that selects PII.
 2. The session state carries the Brand scope.
 3. A span gets to the JSONL trace file.
 4. `SELECT WITH AGGREGATION_THRESHOLD` works on a view over the public dataset (see ADR 0005).
 
-If checks 1–3 fail, the adapter changes to a plain `google-genai` loop. The core does not change.
+If we must replace ADK later, only the adapter changes, to a plain `google-genai` loop. The core does not change. `tests/test_architecture.py` makes sure that the core does not import ADK.
 
 ## Spike result
 
@@ -26,8 +26,8 @@ On 2026-11-16, all four checks passed with `google-adk` 2.14.1 and `gemini-3.5-f
 
 What the spike also showed:
 
-- On the free tier, `gemini-3.8-flash` often returned 503 "high demand", and `gemini-3.5-flash-lite` sometimes did too. The default retry of `google-genai` hid a 503 for minutes. Set `retry_options` on the ADK `Gemini` model to bound the retries (P15).
-- After the retries, a 503 stops the whole ADK run. ADK does not change to a different model. Our Turn error handler must catch the error and run the Turn again with the fallback model (P15).
+- On the free tier, `gemini-3.8-flash` often returned 503 "high demand", and `gemini-3.5-flash-lite` sometimes did too. The default retry of `google-genai` hid a 503 for minutes. Thus the ADK `Gemini` model has `retry_options` with 1 attempt, and our backoff controls the retries (P15).
+- After the retries, a 503 stops the whole ADK run. ADK does not change to a different model. Thus the Turn API catches the error and runs the Turn again with the fallback model (P15).
 
 ## Considered options
 

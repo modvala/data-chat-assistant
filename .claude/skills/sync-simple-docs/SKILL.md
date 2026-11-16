@@ -20,7 +20,7 @@ There are two kinds of page:
 2. **Read the sources.** For each selected page, read its spec in PAGES.md and every source that the spec lists, in full. For a source page, also run the commands that it documents, or read the code that makes them (`--help` output, `pyproject.toml`, `.env.example`, `scripts/`). Done when you can name the source of each statement that you will write.
 3. **Write each page.** Follow its outline in PAGES.md and the rules below. Keep the file name and the heading anchors of a page that exists, because people share its URLs. Done when each outline item is on the page.
 4. **Check each page** against every rule below, one rule at a time. Done when each rule passes on each page.
-5. **Build** with `NO_MKDOCS_2_WARNING=1 uv run --only-group docs mkdocs build --strict`. The build also checks the anchors of links between site pages. Done when it passes with no warning.
+5. **Build** with `NO_MKDOCS_2_WARNING=1 uv run --locked --only-group docs mkdocs build --strict`. The build also checks the anchors of links between site pages. Done when it passes with no warning.
 6. **Report** to the user: the pages that changed, and each **disagreement** that you found between the detailed docs, the code and the site. Write a disagreement as: what each source says, with its file and line. Fix only the site. The detailed docs and the code stay as they are. Done when each changed page and each disagreement is in the report.
 
 ## Rules
