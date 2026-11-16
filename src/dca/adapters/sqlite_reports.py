@@ -140,7 +140,7 @@ class SQLiteReportStore:
     def last_batch(self, actor: str) -> DeleteBatch | None:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM delete_batches WHERE executive_id = ? ORDER BY deleted_at DESC LIMIT 1", (actor,)
+                "SELECT * FROM delete_batches WHERE executive_id = ? ORDER BY rowid DESC LIMIT 1", (actor,)
             ).fetchone()
         if row is None:
             return None
@@ -152,6 +152,25 @@ class SQLiteReportStore:
             undo_until=datetime.fromisoformat(row["undo_until"]),
             restored=bool(row["restored"]),
         )
+
+    def restore(self, batch_id: str, actor: str) -> list[str]:
+        """Restores the reports of one delete batch of `actor`. A batch of another Executive restores nothing."""
+        with self._connect() as connection:
+            ids = [
+                row["report_id"]
+                for row in connection.execute(
+                    "SELECT report_id FROM reports WHERE owner_id = ? AND delete_batch_id = ? ORDER BY report_id",
+                    (actor, batch_id),
+                )
+            ]
+            connection.execute(
+                "UPDATE reports SET deleted_at = NULL, delete_batch_id = NULL WHERE owner_id = ? AND delete_batch_id = ?",
+                (actor, batch_id),
+            )
+            connection.execute(
+                "UPDATE delete_batches SET restored = 1 WHERE batch_id = ? AND executive_id = ?", (batch_id, actor)
+            )
+        return ids
 
     def audit(self, entry: AuditEntry) -> None:
         with self._connect() as connection:
@@ -172,7 +191,7 @@ class SQLiteReportStore:
     def audit_entries(self, actor: str) -> Iterator[AuditEntry]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM audit_log WHERE executive_id = ? ORDER BY at, entry_id", (actor,)
+                "SELECT * FROM audit_log WHERE executive_id = ? ORDER BY rowid", (actor,)
             ).fetchall()
         for row in rows:
             yield AuditEntry(
