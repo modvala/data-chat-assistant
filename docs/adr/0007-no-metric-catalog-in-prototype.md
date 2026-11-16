@@ -1,8 +1,8 @@
-# The prototype has no Metric catalog; Trios carry the interpretation
+# The prototype has no Metric catalog and no Trios; the LLM interprets the terms
 
 Scope: prototype
 
-The dataset has no definition of terms such as "churn" or "underspending", and fixed definitions are complex to agree on. So the prototype has no Metric catalog. The interpretation of such a question lives in the Trio itself: its SQL and its report show how an analyst understood it. This is the purpose of R1. In the prototype, Trio retrieval uses only embeddings, with no metric tags.
+The dataset has no definition of terms such as "churn" or "underspending", and fixed definitions are complex to agree on. So the prototype has no Metric catalog. The prototype also has no Trios, because the Golden Bucket is a Bonus that is not done. Thus the LLM interprets such a term from the schema description, and the Answer shows the interpretation as an assumption (P22). In the design, the Trio carries the interpretation: its SQL and its report show how an analyst understood the question (R1). Until the Metric catalog exists, Trio retrieval uses only embeddings, with no metric tags.
 
 The design keeps P12: the Metric catalog is the production target. In production, the Metric catalog can hold more than one Metric variant of a metric, for example `churn_90d` and `churn_60d`. One variant is the organization default. An Executive who wants a different variant names it in the question. Each Answer names the variant that it used (P22).
 

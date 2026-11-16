@@ -50,7 +50,6 @@ class Retry(BaseModel):
 class Timeout(BaseModel):
     llm_call_s: float
     bq_job_s: float
-    request_s: float
 
 
 class Confirmation(BaseModel):
@@ -64,7 +63,6 @@ class Limits(BaseModel):
     table_rows_shown: int
     trace_rows: int
     conversation_tokens: int
-    schema_tokens: int
     input_max_chars: int
     classifier_questions: int
 

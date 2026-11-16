@@ -1,8 +1,8 @@
 # Demo tour
 
-**Status:** each scenario was tested on the real CLI on `main` ([issue #25](https://github.com/modvala/data-chat-assistant/issues/25)).
+**Status:** each scenario was tested on the real CLI on `main` ([issue #25](https://github.com/modvala/data-chat-assistant/issues/25)). Input 7 of D5 was not run again after the change of the delete reply.
 
-This page has one scenario for each feature that is available now. Each scenario gives the inputs to type and what you see. [Home](index.md) tells how each feature works.
+This page has scenarios for the main features that are available now. Each scenario gives the inputs to type and what you see. [Home](index.md) tells how each feature works.
 
 Before you start, do the setup in [Get started](get-started.md).
 
@@ -267,7 +267,7 @@ What you see:
     ```
 
 6. The matched reports. The prompt stays `confirm ›`, because a command does not cancel the request.
-7. `Nothing was deleted.`, then the agent handles `yes` as a normal question. A wrong count, such as `delete 3`, also cancels.
+7. `Nothing was deleted.` The reply `yes` is not a question about the data, so you get only this notice. A wrong count, such as `delete 3`, also cancels.
 8. The confirmation panel again.
 9. `✓ Deleted 2 Saved Reports. Type /undo before … to restore them.`
 

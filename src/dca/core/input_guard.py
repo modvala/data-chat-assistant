@@ -49,7 +49,7 @@ CLASSIFIER_SCHEMA = {
 @dataclass(frozen=True)
 class InputDecision:
     intent: str
-    reason: str = ""  # for a block: size, format, injection, intent; for a pass: empty
+    reason: str = ""  # for a block: size, format, injection, intent; for a pass: empty, or classifier_unavailable
 
     @property
     def blocked(self) -> bool:

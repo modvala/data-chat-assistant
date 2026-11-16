@@ -4,7 +4,7 @@ A query that uses age, gender, state or city is demographic. A row list of Custo
 refusal `pii`. An aggregate goes to the threshold view (k = 5) with `WITH AGGREGATION_THRESHOLD`,
 or, when the view is not available, gets `HAVING COUNT(DISTINCT id) >= k`.
 
-The router supports the shape that the spike proved: one aggregate level over the scoped data.
+The router supports the shape that ADR 0005 tested: one aggregate level over the scoped data.
 All functions work on a tree that `qualify()` made, so each column has its table alias.
 """
 

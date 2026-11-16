@@ -1,7 +1,7 @@
 """The channel-neutral Answer model of cli.md: kind, blocks and Provenance.
 
 The LLM makes only `heading`, `text`, `bullets`, `kpi` and `action_items` blocks.
-Our code makes `table`, `notice`, `refusal`, `confirmation` and `result` blocks (DS3).
+Our code makes `table`, `notice`, `refusal`, `confirmation`, `result`, `sql` and `trace` blocks (DS3).
 """
 
 from datetime import datetime

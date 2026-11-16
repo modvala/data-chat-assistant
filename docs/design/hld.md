@@ -2,7 +2,6 @@
 
 | Item | Value |
 | --- | --- |
-| Status | Draft. It waits for approval. |
 | Covers | The architecture of the full solution: the local prototype and production on GCP. |
 | CLI display | The [CLI design](cli.md) owns the Answer model, the block types and the CLI components. This document links to it and does not repeat it. |
 | Sources | [Technical assignment](../requirements/2026-11-12-client-technical-assignment.md), [Project client decisions](../requirements/2026-11-12-client-decisions.md), [design principles](../design-principles.md), [ADRs](../adr/), [tech stack](../tech-stack.md), [coverage table](../requirements-coverage.md), [glossary](../../CONTEXT.md) |
@@ -46,7 +45,7 @@ The non-technical **Executives** of a retail company ask questions about sales d
 
 This document is deliverables 1 and 2 of the [technical assignment](../requirements/2026-11-12-client-technical-assignment.md): the architecture diagrams and the detailed technical explanation. It has two levels (P4):
 
-- The **logical architecture** (sections 4–17) names no vendor. It is the same for the prototype and for production.
+- The **logical architecture** (sections 4–17) names no vendor. It is the same for the prototype and for production. The prototype builds a part of it. The [coverage table](../requirements-coverage.md) shows which parts.
 - The **physical architecture** (sections 18–20) names the GCP services for production and the local parts for the prototype.
 
 The main design idea: **the LLM is not trusted**. It only proposes SQL and drafts. Our code makes all security decisions (P8).
@@ -88,7 +87,7 @@ The acceptance criteria (AC) are in the [coverage table](../requirements-coverag
 - OpsFleet prefers a recent Gemini model and tests with Gemini (P7). The prototype uses the Gemini API free tier, so the rate limits are low.
 - The prototype has a CLI chat interface. It runs on a different machine with setup instructions.
 - The assignment takes 6–12 hours. The design is more important than bonus code (P2).
-- Google ADK runs the **Agent loop** as a thin adapter (ADR 0003). We have no earlier experience with ADK.
+- Google ADK runs the **Agent loop** as a thin adapter (ADR 0003). Before this project, we had no experience with ADK.
 - The [Project client decisions](../requirements/2026-11-12-client-decisions.md) fix the access rule (brand only), the PII rule (`user_id` is permitted) and the tool preference (uv).
 
 ## 3. Assumptions and starting values
@@ -136,7 +135,7 @@ These values are configuration (P17), not requirements. Tune them with the eval 
 | V18 | Context limits: Persona 2 k, Executive profile 0.5 k, schema 2 k, Metric catalog 1 k, Trios 3 k and conversation 6 k LLM tokens. 50 result rows to the LLM. | Starting value. |
 | V19 | The SQL guard adds `LIMIT 50`, or lowers a larger `LIMIT` to 50. | P8 asks for a `LIMIT`. |
 | V20 | A trace keeps the first 20 result rows, after the Output guard. | Starting value. The same as the 20 rows of [cli.md C6](cli.md#c6-data-table). |
-| V21 | Executive profile: in the prototype, an explicit edit wins (`/profile set`, bonus). The learning in production is open: no logic and no numbers are fixed. | Decision. [Section 27](#27-open-questions). |
+| V21 | Executive profile: the prototype has none. In production, an explicit edit wins. The learning logic and its numbers are open. | Decision. [Section 27](#27-open-questions). |
 | V22 | Human labels: 20–50 Answers each quarter, and again after a change of the rubric | Starting value. |
 | V23 | Alert: Turn success rate less than 95 % in 1 hour | Starting value. |
 | V24 | Alert: p95 latency more than 45 s in 1 hour | From V1. |
@@ -288,17 +287,19 @@ classDiagram
     Core ..> ConfigStore
 ```
 
+The prototype ports have only the methods that the prototype uses (`src/dca/core/ports.py`). For example, `KnowledgeStore` has only `schema()`.
+
 | Port | Building block | Prototype adapter | GCP adapter |
 | --- | --- | --- | --- |
 | `LLMClient` | Language model | Gemini API with an API key | Gemini on Vertex AI |
-| `Warehouse` | Sales warehouse | BigQuery library with the application default credentials of the reviewer | BigQuery library with the OAuth token of the Executive |
+| `Warehouse` | Sales warehouse | BigQuery library with application default credentials that impersonate the read-only service account `dca-agent` | BigQuery library with the OAuth token of the Executive |
 | `ReportStore` | Saved Reports and audit log | SQLite | Firestore |
-| `KnowledgeStore` | Knowledge | Trio YAML file and an in-memory cosine index (numpy) | Cloud Storage, BigQuery `VECTOR_SEARCH`, Metric catalog YAML |
+| `KnowledgeStore` | Knowledge | The schema description, made from the scoped view definitions. No Trios. | Cloud Storage, BigQuery `VECTOR_SEARCH`, Metric catalog YAML |
 | `Tracer` | Observability | OpenTelemetry SDK with a JSONL exporter | OpenTelemetry to Cloud Trace, structured logs to Cloud Logging |
 | `SessionStore` | Sessions and pending confirmations | In memory | Firestore |
-| `ConfigStore` | Access mapping, Persona, Executive profiles | `executives.json`, `persona.yaml`, one YAML file for each Executive | BigQuery access table; Firestore for the Persona and the profiles |
+| `ConfigStore` | Access mapping, Persona, Executive profiles | `executives.json`. The prototype has no Persona file and no Executive profiles. | BigQuery access table; Firestore for the Persona and the profiles |
 
-The agent framework is also an adapter (P6). A chaos wrapper can wrap any adapter. It injects failures from the `CHAOS` environment variable ([section 15.6](#156-chaos-mode)).
+The agent framework is also an adapter (P6). A chaos wrapper goes around the `LLMClient` adapter, the ADK model and the `Warehouse` adapter. It injects failures from the `CHAOS` environment variable ([section 15.6](#156-chaos-mode)).
 
 ## 5. Turn API
 
@@ -313,7 +314,7 @@ The core gives one Turn API (P20). The prototype calls it in the same process. P
 | Cancel | `cancel(session_id)` | `POST /v1/sessions/{session_id}/turns/{trace_id}/cancel` | The Turn stops. A notice "Cancelled". |
 | Command | `command(session_id, name, args)` | `POST /v1/sessions/{session_id}/commands` | One Answer. No LLM call. |
 
-The commands are the commands of [cli.md C17](cli.md#c17-help): `/scope`, `/sql [all]`, `/trace <id>`, `/save [title]`, `/list`, `/undo` and `/profile` (also `/profile set`). The CLI does `/help` and `/exit` itself. `/sql` shows the final SQL after the Brand scope rewrite ([cli.md C14](cli.md#c14-sql-view)).
+The commands are the commands of [cli.md C17](cli.md#c17-help): `/scope`, `/sql [all]`, `/trace <id>`, `/save [title]`, `/list` and `/undo`. The prototype has no `/profile` command. The CLI does `/help` and `/exit` itself. `/sql` shows the final SQL after the Brand scope rewrite ([cli.md C14](cli.md#c14-sql-view)).
 
 ### 5.2 Progress events
 
@@ -322,7 +323,7 @@ The progress events are the states of [cli.md C3 Turn status](cli.md#c3-turn-sta
 | Event | C3 state | When |
 | --- | --- | --- |
 | `thinking` | Thinking | The Input guard and the plan |
-| `retrieval` | Retrieval | Trio retrieval |
+| `retrieval` | Retrieval | Trio retrieval. The prototype does not send this event. |
 | `sql` | SQL | The LLM writes SQL |
 | `dry_run` | Dry run | The SQL guard and the dry run |
 | `query` | Query | The query runs |
@@ -337,7 +338,7 @@ The progress events are the states of [cli.md C3 Turn status](cli.md#c3-turn-sta
 | --- | --- | --- |
 | Sign-in | None. `--executive <id>` (A9). | One desktop OAuth login in the CLI (ADR 0001). [Open question 1](#27-open-questions) checks that one login gives the IAP token and the BigQuery token. |
 | IAP | None | The IAP token goes in the `Proxy-Authorization` header. IAP checks it. |
-| BigQuery | Application default credentials of the reviewer | The BigQuery token of the Executive goes in the `Authorization` header. The Turn service uses it only for the queries of this Turn. It does not store it. |
+| BigQuery | Application default credentials that impersonate the read-only service account `dca-agent` | The BigQuery token of the Executive goes in the `Authorization` header. The Turn service uses it only for the queries of this Turn. It does not store it. |
 | Role and Brand scope | `executives.json` | The access table, read on each Turn (A1) |
 
 ### 5.4 Answer
@@ -475,7 +476,7 @@ flowchart TD
     P -->|no| IG{Input guard}
     IG -->|"injection, size or format,<br/>not analysis"| R["Refusal<br/>reason not_analysis"]
     IG -->|"schema question"| SC["Answer from the<br/>schema description"]
-    IG -->|"profile request"| PRF["Explicit profile update"]
+    IG -->|"profile request (production)"| PRF["Explicit profile update"]
     IG -->|"analysis, report Answer or delete"| AN["Agent loop with tools"]
     AN --> REP{"Report Answer asked?"}
     REP -->|yes| RP["Answer with Action items<br/>offer /save"]
@@ -492,7 +493,7 @@ Each tool has a Side-effect class. The class selects the guard.
 | Tool | What it does | Side-effect class | Guard |
 | --- | --- | --- | --- |
 | `describe_schema` | Returns the description of the scoped views and their columns | read | None |
-| `search_trios` | Returns the top-k Trios for a question | read | None |
+| `search_trios` | Returns the top-k Trios for a question (design; the prototype has no Trios) | read | None |
 | `lookup_metric` | Returns the definition of a Metric variant (production) | read | None |
 | `run_query` | Runs SQL against the scoped views | read | SQL guard and budgets ([section 8](#8-safety-pipeline)) |
 | `save_report` | Saves the current analysis as a Saved Report with its Customer IDs | write-own | The owner is the Executive of the Turn |
@@ -501,7 +502,7 @@ Each tool has a Side-effect class. The class selects the guard.
 
 - The LLM has no delete tool (ADR 0002).
 - The commands `/save` and `/list` call the same code as `save_report` and `list_reports`, with no LLM.
-- Charts need no tool. The core makes a `chart` block from a `table` block ([cli.md block types](cli.md#block-types)).
+- Charts need no tool. In the design, the core makes a `chart` block from a `table` block. The prototype makes no charts ([cli.md block types](cli.md#block-types)).
 - An `outward` class (for example, email) and a `destructive` class always go through the Confirmation gate ([section 23](#23-extension-points)).
 
 ## 8. Safety pipeline
@@ -550,7 +551,7 @@ flowchart LR
 | --- | --- | --- |
 | Size and format | Rules: maximum length, no binary content | Refusal `not_analysis` |
 | Known injection patterns | Rules: "ignore previous instructions", requests for the system prompt | Refusal `not_analysis` |
-| Intent | `gemini-3.5-flash-lite` with structured output: `analysis`, `schema_question`, `report`, `delete`, `profile`, `other`. The classifier also gets the last answered questions of the session (`limits.classifier_questions`, default 3), so that a follow-up such as "explain that in more detail" is `analysis`. A refused message does not come back. A reply to a delete preview gets no earlier questions, because it is not a follow-up. | `other` gets a refusal `not_analysis` |
+| Intent | `gemini-3.5-flash-lite` with structured output: `analysis`, `schema_question`, `report`, `delete`, `other`. The classifier also gets the last answered questions of the session (`limits.classifier_questions`, default 3), so that a follow-up such as "explain that in more detail" is `analysis`. A refused message does not come back. A reply to a delete preview gets no earlier questions, because it is not a follow-up. | `other` gets a refusal `not_analysis` |
 | Prompt injection and jailbreak | Model Armor (production) | Refusal `not_analysis` |
 
 The Input guard is only the first filter. The safety of the data does not depend on it, because the SQL guard and the warehouse apply the rules again.
@@ -655,7 +656,7 @@ flowchart LR
 
 - The service account has no read access to the curated sales tables. Thus a query cannot run without the identity of the Executive.
 - The documented limits of this policy form apply: 100 MB for the subquery, and no data masking on the same table.
-- [Open questions 2, 3 and 4](#27-open-questions) check the policy, the threshold view and the perimeter.
+- [Open questions 2 and 3](#27-open-questions) check the policy and the perimeter.
 - A real intersection of the service identity and the Executive identity is a future target. BigQuery has no mechanism for it today. Credential Access Boundaries work only for Cloud Storage ([section 26](#26-what-to-revisit)).
 
 ### 8.7 Demographic router
@@ -693,7 +694,7 @@ The Executive sees only the five refusal reasons of [cli.md C11 Notice](cli.md#c
 | `not_analysis` | The intent `other`. Prompt injection. A size or format rule. A Model Armor block of the input. |
 | `threshold` | The threshold hides all groups of a demographic query. |
 | `budget` | The dry run is over the bytes limit. A Turn budget runs out. |
-| None (internal) | Syntax error, not read-only, raw table. A typed reason goes to the LLM. The Executive does not see it. |
+| None (internal) | Syntax error, not read-only, raw table, unknown column, unsupported demographic shape. A typed reason goes to the LLM. The Executive does not see it. |
 
 ### 8.10 What the LLM sees
 
@@ -725,7 +726,7 @@ flowchart TB
 | Conversation | `SessionStore` | 6 k LLM tokens |
 | Results of the tools in this Turn | Tool calls | 50 rows to the LLM |
 
-When the context gets near the LLM token budget (V7), the assembler cuts the parts with the lowest value first: first the older conversation, then the Trios.
+Each part has its own size limit. In the prototype, only the conversation limit is in code: the oldest Turns go first.
 
 ### 9.3 Dates
 
@@ -733,7 +734,7 @@ The data is synthetic, and its date range changes (P19). The context assembler g
 
 ### 9.4 Conversation memory
 
-The session keeps all Turns. The context gets the last Turns in full, a rolling summary of the older Turns, and a handle for each earlier query (ID, SQL, columns, row count). Thus the Executive can ask "and how does it compare to state Y?", and the context stays small.
+The session keeps all Turns. The context gets the last answered Turns as short summaries, up to 6 k LLM tokens (V18). Then it gets a handle for each earlier query (ID, SQL, columns, row count) in the space that is left. Older Turns and refused Turns do not come back. Thus the Executive can ask "and how does it compare to state Y?", and the context stays small.
 
 ## 10. Destructive operations
 
@@ -937,11 +938,11 @@ No store holds PII from the warehouse. A Saved Report records only Customer IDs 
 | Sessions, Turns, pending confirmations | In memory, behind `SessionStore` | Firestore | Sessions 90 days (V13). A pending confirmation until it is confirmed, cancelled or expired (V11). |
 | Saved Reports, Customer IDs, delete batches | SQLite | Firestore | Until deleted, then a purge after 30 days (V12) |
 | Audit log | SQLite | Firestore | 1 year (V14) |
-| Executive profiles | One YAML file for each Executive | Firestore | Until the Executive leaves (V16) |
-| Persona | `persona.yaml` | Firestore: one document for each version and an `active` pointer | All versions |
-| Golden Bucket | Trio YAML file and an in-memory index | Cloud Storage (source of truth, versioned) and a BigQuery Trio table | All versions; retired versions marked |
+| Executive profiles | None | Firestore | Until the Executive leaves (V16) |
+| Persona | None. The tone is fixed in code. | Firestore: one document for each version and an `active` pointer | All versions |
+| Golden Bucket | None | Cloud Storage (source of truth, versioned) and a BigQuery Trio table | All versions; retired versions marked |
 | Metric catalog | None (ADR 0007) | YAML in Git, published to Cloud Storage by CI | All versions in Git |
-| Eval set | `eval/` in the repository | Same, larger | In Git |
+| Eval set | None. The design is in section 17 and ADR 0006. | Same, larger | In Git |
 | Traces and logs | JSONL file | Cloud Trace; structured logs in Cloud Logging, with a log sink to BigQuery | Cloud Trace 30 days; BigQuery copy 3 months (V15) |
 
 ## 12. Knowledge: Golden Bucket and Metric catalog
@@ -984,7 +985,7 @@ sequenceDiagram
 - The Trio SQL uses the scoped views, so a Trio does not depend on the Brand scope.
 - A Trio shows how an analyst interpreted a question. It is not an answer: the agent always runs a new query on the live data.
 - The Answer lists the IDs of the Trios that it used (AC-R1.1). If no Trio is over the threshold, the context has no Trio.
-- Prototype: the Trios are in one YAML file with an in-memory index. Retrieval uses embeddings only (ADR 0007).
+- Prototype: there are no Trios. Trio retrieval is a bonus that is not built (AC-R1.1, AC-R1.3). If it is built, it uses embeddings only (ADR 0007).
 - Production: BigQuery `VECTOR_SEARCH` with an exact search while the Golden Bucket is small. Metric tags filter the Trios, so "churn" finds churn Trios also with different words.
 
 ### 12.3 How the Golden Bucket changes over time
@@ -1020,7 +1021,7 @@ The Metric catalog is a YAML file in Git (production only, ADR 0007). Analysts c
 - Each Answer names the variant that it used in its Provenance (P22).
 - The Executive profile holds no default variant. Thus two Executives always get the same number for the same question.
 
-The prototype has no Metric catalog. The Trio carries the interpretation.
+The prototype has no Metric catalog and no Trios. The LLM interprets a metric term, and the Answer states the interpretation in its assumptions (ADR 0007).
 
 ## 13. Learning loop
 
@@ -1043,7 +1044,7 @@ flowchart LR
 
 - The profile has the settings of [cli.md C16 Profile view](cli.md#c16-profile-view): `format`, `depth`, `length` and `charts`. The core maps them to blocks as in [cli.md P-FORMAT](cli.md#p-format-format-from-the-executive-profile).
 - An explicit edit wins over a learned value. A learned value never replaces it.
-- Prototype: only explicit edits with `/profile set` (V21, AC-R4.3, bonus).
+- Prototype: none. AC-R4.3 (`/profile set`, bonus) is not built.
 - Production: a job updates the profile after each Turn, so the Turn is not slower. Learned values have a confidence and a decay (AC-R4.1). The learning logic and its numbers are open (V21, [section 27](#27-open-questions)).
 - `/profile` shows each value with its source. The Executive can edit or remove each value.
 - The profile holds presentation preferences only. It holds no metric definitions (ADR 0007).
@@ -1128,7 +1129,7 @@ sequenceDiagram
 | Reload | The Turn service reads the active version at the start of each Turn. There is no cache (AC-R8.1). |
 | Audit | Each trace records `persona_version` (AC-R8.2). |
 
-The prototype reads `persona.yaml` at the start of each Turn (AC-R8.3).
+The prototype has no `persona.yaml`. The tone is fixed in code (`TONE` in `src/dca/core/context.py`). Each trace records `persona_version` from the configuration (`builtin-1`). AC-R8.3 is a bonus that is not built.
 
 ## 15. Resilience and error handling
 
@@ -1138,7 +1139,7 @@ The prototype reads `persona.yaml` at the start of each Turn (AC-R8.3).
 flowchart TB
     S[LLM SQL] --> V{SQL guard}
     V -->|"PII or Brand scope"| REF["Refusal pii or scope<br/>no retry"]
-    V -->|"technical block:<br/>syntax, not read-only, raw table"| AT
+    V -->|"technical block:<br/>syntax, not read-only, raw table,<br/>unknown column, demographic shape"| AT
     V -->|pass| DR{"Dry run<br/>free"}
     DR -->|"syntax or schema error"| AT{"Corrections left?<br/>not more than 2"}
     AT -->|yes| FIX["Typed reason and schema<br/>to the LLM for a fix"]
@@ -1191,7 +1192,7 @@ The fallback model runs the Turn again from the start. Its BigQuery jobs get new
 | BigQuery bytes over the limit | Dry run, `maximum_bytes_billed` | No retry | Refusal `budget` |
 | Embedding or vector search down | Exception | Continue with no Trios | A normal Answer with no Trio IDs. The trace records the degradation. |
 | State store write fails (production) | Exception | Retry. The Turn fails before the Answer if it cannot save the session. | Error notice |
-| Trace exporter fails | Exception | Spans go to a local buffer. A trace failure never fails a Turn. | Nothing |
+| Trace exporter fails | Exception | In the prototype, the tracer writes a warning and drops the record. In production, spans go to a local buffer. A trace failure never fails a Turn. | Nothing |
 | The final Answer is JSON that does not parse | `json.loads` fails on text that starts with `{` | One repair call on the fallback model, with structured output and backoff. It counts in the Turn budget. | A normal Answer. If the repair fails: the tables of the query results with a warning notice, or an error notice when there are no results. The outcome is `failed`. Never raw JSON. |
 | Bug in our code | Any exception | The Turn error handler catches it | Error notice with the `trace_id`. The CLI does not stop. |
 
@@ -1240,7 +1241,7 @@ flowchart TB
     T --> CF["confirmation<br/>state change, count"]
 ```
 
-- No PII goes into a trace (AC-R7.1). The trace keeps the final SQL, the row count, the column names and the first 20 result rows after the Output guard (V20). Prompts in the trace contain only data that passed the guards.
+- No PII goes into a trace (AC-R7.1). The trace keeps the final SQL, the row count, the column names and the first 20 result rows after the Output guard (V20). The trace keeps no prompt text and no answer text.
 - The Executive ID is a hash in production.
 - `turn.outcome` has the end states of [cli.md P-TURN](cli.md#p-turn-turn-lifecycle): `answered`, `refused`, `failed`, `pending`, `done` and `cancelled`.
 - Each log line is structured JSON with the `trace_id`.
@@ -1251,17 +1252,21 @@ flowchart TB
 | --- | --- |
 | `turn` | The header line: `trace_id`, time, duration, outcome |
 | `guard.input` | `input classifier` |
-| `knowledge.retrieve_trios` | `trio retrieval` |
+| `knowledge.retrieve_trios` (production) | `trio retrieval` |
 | `llm.generate` | `llm <model>` |
 | `guard.sql` | `sql validation` |
+| `bq.dry_run`, only with an error | `dry run` |
 | `bq.query` | `bigquery` |
+| `bq.diagnostic` | `empty result check` |
 | `guard.output` | `output check` |
+| `confirmation`, `undo` | `confirmation`, `undo` |
+| `report.save` | `save report` |
 
-`context.assemble`, `tool.run_query` and `bq.dry_run` are parent or detail spans. They have no row of their own in C15.
+`context.assemble` and `tool.run_query` have no row of their own in C15. `bq.dry_run` has a row only when it has an error.
 
 ### 16.2 Metrics
 
-We define the metrics before the code (AC-R7.2). Each metric comes from a span attribute or a log field. "Extra" marks a metric that AC-R7.2 does not list.
+Each metric comes from a span attribute or a log field. `uv run dca-metrics` calculates the metrics from the JSONL trace file. "Extra" marks a metric that AC-R7.2 does not list.
 
 | Metric | Definition | Source | Alert (production) |
 | --- | --- | --- | --- |
@@ -1272,9 +1277,9 @@ We define the metrics before the code (AC-R7.2). Each metric comes from a span a
 | Empty-result rate | Queries with 0 rows / all queries | `bq.query.rows` | More than 20 % in 1 day (V25) |
 | LLM error rate and fallback rate | LLM calls with an error / all calls; calls to the fallback model / all calls | `llm.generate` | Fallback more than 10 % in 15 minutes (V25) |
 | Latency | p50 and p95 of the Turn wall time | `turn` span | p95 more than 45 s in 1 hour (V24) |
-| Cost for each Turn | LLM tokens × price, plus bytes × price | `turn.cost` | Daily total over the budget (V25) |
+| Cost for each Turn | LLM tokens × price, plus bytes × price | `turn.cost_usd` | Daily total over the budget (V25) |
 | Confirmation completion and abort rate | Done / pending; cancelled or expired / pending | `confirmation` span | Abort more than 50 % in 1 week (V25) |
-| Budget stop rate (extra) | Turns stopped by a budget / all Turns | `turn.outcome`, reason `budget` | More than 5 % in 1 day (V25) |
+| Budget stop rate (extra) | Turns stopped by a budget / all Turns | `budget.limit` on the `turn` span | More than 5 % in 1 day (V25) |
 
 An uptime check calls a health endpoint of the Turn service, and a Cloud Billing budget alert covers the total cost.
 
@@ -1304,9 +1309,9 @@ flowchart LR
 
 | Level | What it checks | When | Gate | Prototype |
 | --- | --- | --- | --- | --- |
-| Unit tests (pytest) | Each guard, the Brand scope rewrite, the router, the confirmation flow and the budgets | Each push | All pass | Yes (P23) |
-| Red-team tests (pytest) | PII requests, other brands, prompt injection, poems, requests for the system prompt | Each push | All blocked | Yes (P23) |
-| Eval set | Execution accuracy: the result set of the agent equals the result set of the reference SQL, with a tolerance for order and rounding | CI on changes to `src/` or `eval/`, and before each release | No drop against the last release | 5 questions (AC-R6.1, bonus) |
+| Unit tests (pytest) | Each guard, the Brand scope rewrite, the router, the confirmation flow and the budgets | Each push | All pass | Yes (P23). Run them with `uv run pytest`. No CI job runs them. |
+| Red-team tests (pytest) | PII requests, other brands, prompt injection, poems, requests for the system prompt | Each push | All blocked | Yes (P23). Run them with `uv run pytest`. No CI job runs them. |
+| Eval set | Execution accuracy: the result set of the agent equals the result set of the reference SQL, with a tolerance for order and rounding | CI on changes to `src/` or `eval/`, and before each release | No drop against the last release | None (AC-R6.1, bonus, not built) |
 | LLM judge | The rubric: does the Answer reply to the question, are the numbers in the text the same as in the result, are the Action items specific | Before each release | Average score over the threshold | Design (AC-R6.2) |
 | Human labels | 20–50 Answers labeled by analysts calibrate the judge: the agreement of the judge and the humans (V22) | Each quarter, and after a change of the rubric (V22) | Agreement over the threshold | Design |
 | Pairwise UX test | An Executive sees two Answer variants and selects the better one | Before a change of format or Persona with a large effect | Win rate of the new variant | Design (AC-R6.3) |
@@ -1314,7 +1319,7 @@ flowchart LR
 
 - The eval set is separate from the Golden Bucket (ADR 0006). Thus retrieval cannot find the answer of an eval question.
 - The eval gate blocks a release when the execution accuracy or the judge score goes down, or when one red-team test fails.
-- CI publishes the eval report to the documentation site (AC-R6.1).
+- In production, CI publishes the eval report to the documentation site (AC-R6.1).
 
 How the judge checks that an Answer replies to the intent:
 
@@ -1426,8 +1431,7 @@ flowchart LR
         TA --> CORE[Core]
         CORE --> ADK[ADK adapter]
         CORE --> SQLITE[("SQLite<br/>Saved Reports, audit log")]
-        CORE --> YAML[("YAML and JSON<br/>persona.yaml, profiles, executives.json")]
-        CORE --> TRIOS[("Trio YAML file<br/>in-memory index")]
+        CORE --> JSON[("JSON<br/>executives.json")]
         CORE --> MEM[("In memory<br/>sessions")]
         CORE --> JSONL[("JSONL trace file")]
     end
@@ -1438,9 +1442,8 @@ flowchart LR
 | Component | Prototype choice |
 | --- | --- |
 | Channel | Typer and Rich CLI, as in [cli.md](cli.md). |
-| Agent loop | Google ADK, with a plain `google-genai` loop as the fallback (ADR 0003). |
+| Agent loop | Google ADK, as a thin adapter (ADR 0003). |
 | LLM | `gemini-3.8-flash`, fallback `gemini-3.5-flash-lite`, from the configuration. |
-| Embeddings | `gemini-embedding-2` with an in-memory cosine search (numpy). |
 | SQL guard | sqlglot with the BigQuery dialect. |
 | Warehouse | The public dataset, plus a threshold view in the reviewer's project (`uv run setup-bq`). |
 | Stores | The local adapters of [section 4.4](#44-ports). |
@@ -1452,7 +1455,7 @@ Cost of the prototype: $0.
 | --- | --- | --- | --- |
 | LLM | Gemini API free tier, with a key from Google AI Studio | Low rate limits. Google can use the prompts and the responses to improve its products (A10). | $0 |
 | Warehouse | BigQuery sandbox | 1 TB of free query compute each month (technical assignment). The dataset is smaller than 1 GB (V28). | $0 |
-| Stores and traces | Local files: SQLite, YAML, JSON, JSONL | The disk of the reviewer's machine | $0 |
+| Stores and traces | Local files: SQLite, JSON, JSONL | The disk of the reviewer's machine | $0 |
 
 Setup: `uv sync`, copy `.env.example` to `.env`, `scripts/setup-gcp.sh` (a project in the BigQuery sandbox and the read-only service account `dca-agent`), `gcloud auth application-default login --impersonate-service-account=dca-agent@<project>.iam.gserviceaccount.com`, `uv run setup-bq`, `uv run chat --executive <id>` (P19). There is no service account key file.
 
@@ -1522,7 +1525,7 @@ flowchart LR
 
 | Capability | Tool | Side-effect class | Note |
 | --- | --- | --- | --- |
-| Charts | None | — | The core already makes `chart` blocks from `table` blocks. A web renderer draws real charts from the same block ([cli.md C8](cli.md#c8-chart)). |
+| Charts | None | — | The prototype makes no `chart` blocks. In the design, the core makes a `chart` block from a `table` block, and a web renderer draws a real chart from the same block ([cli.md C8](cli.md#c8-chart)). |
 | Send a Saved Report by email | `plan_send_report` | outward | The gate shows the recipients and the content first. Recipients only in the company e-mail domain (A7). A new `Mailer` port. |
 | Web search for trends | `web_search` | read | A new `WebSearch` port. A check of the query text stops internal figures from leaving the perimeter. The results are untrusted data: the Answer keeps them apart from the company data and names their source. |
 
@@ -1541,7 +1544,7 @@ The decisions that are hard to change have an ADR (P18).
 | Compute and state | Cloud Run and Firestore | Agent Platform Runtime with Sessions and Memory Bank | More code, but structured, editable state in our own store and less lock-in | [0004](../adr/0004-cloud-run-and-firestore.md) |
 | Small groups | Aggregation threshold view only on the demographic path | Threshold on all Customer data; `HAVING` only | "Top customers" still works; the routing is our code | [0005](../adr/0005-aggregation-threshold-on-demographic-path.md) |
 | Eval data | Eval set separate from the Golden Bucket | Leave-one-out on Trios | More data to keep, but an honest score | [0006](../adr/0006-eval-set-separate-from-golden-bucket.md) |
-| Metrics in the prototype | No Metric catalog; Trios carry the interpretation | A small YAML catalog | Less work now; the catalog is the production target | [0007](../adr/0007-no-metric-catalog-in-prototype.md) |
+| Metrics in the prototype | No Metric catalog and no Trios; the LLM interprets the terms | A small YAML catalog | Less work now; the catalog is the production target | [0007](../adr/0007-no-metric-catalog-in-prototype.md) |
 | Main LLM | `gemini-3.8-flash` main, `gemini-3.5-flash-lite` fallback and classifier | A Pro model for all Turns | Low cost and latency. A Pro model for long report Answers is a later option, measured with the eval set. | — |
 | Input guard | Rules, a cheap LLM classifier and managed screening | Managed screening only; LLM classifier only | More than one layer. The classifier also gives the intent for routing. | — |
 | Output guard | Rules plus managed PII inspection | Rules only | Managed detection of more PII types, for a small cost for each Answer | — |
@@ -1564,10 +1567,10 @@ The decisions that are hard to change have an ADR (P18).
 | Gemini on Vertex AI | Gemini API free tier (A10) | The data is public and synthetic. Reviewers use their own key. |
 | Model Armor and Sensitive Data Protection | Rules in our code | Our own layers are the main protection. The managed layers are extra. |
 | Cloud Trace, Logging, Monitoring | JSONL file and `/trace` | The same spans and attributes. |
-| Versioned Golden Bucket with review, `VECTOR_SEARCH` and metric tags | 2–3 Trios in YAML, embeddings only, in-memory search | Shows the idea. The update loop is design only. |
-| Metric catalog with Metric variants | None | Trios carry the interpretation (ADR 0007). |
-| Learned Executive profile | YAML profile, explicit edits only (V21, bonus) | Learning is design only. |
-| Admin console and learning loop jobs | `persona.yaml`, read on each Turn; no jobs | A text edit needs no deployment. |
+| Versioned Golden Bucket with review, `VECTOR_SEARCH` and metric tags | None | Trio retrieval is a bonus that is not built. The design shows the update loop. |
+| Metric catalog with Metric variants | None | The LLM interprets the terms, and the Answer states them as assumptions (ADR 0007). |
+| Learned Executive profile | None | R4 is Design and Bonus. |
+| Admin console and learning loop jobs | A fixed tone in code; no jobs | R8 is Design and Bonus. The trace records the Persona version. |
 | Circuit breaker | Retries, timeouts and the fallback model only | One Executive, short sessions. |
 
 ## 26. What to revisit
@@ -1594,17 +1597,16 @@ The decisions that are hard to change have an ADR (P18).
 | --- | --- | --- | --- | --- |
 | 1 | Does one desktop OAuth login give both the IAP token and the BigQuery token? | IAP needs an identity token. BigQuery needs an access token. | Design team | Test in a GCP project. Fallback: two documented logins. |
 | 2 | Does one row access policy with `SESSION_USER()` and a subquery on the access table work on the curated copy? | Not verified (ADR 0001). | Design team | Test in a GCP project. Fallback: one authorized view for each Manager group. |
-| 3 | Does `SELECT WITH AGGREGATION_THRESHOLD` work on a view over the public table? | Answered on 2026-11-16: yes. The ADK spike checked it ([ADR 0005](../adr/0005-aggregation-threshold-on-demographic-path.md#spike-result)). | Design team | Closed. `HAVING COUNT(DISTINCT user_id) >= 5` stays for an expired view (ADR 0005). |
-| 4 | Does VPC Service Controls block the read of the public dataset for the scheduled copy? | The perimeter can block a read of a dataset outside it. | Design team | Test: run the copy from a project inside a test perimeter. |
-| 5 | Which Cloud Run CPU allocation do we need? | The server-sent events and the work after each Turn can need CPU outside a request. | Design team | Test: measure the latency and the cost at the peak of V5. |
-| 6 | How does the Executive profile learn in production? | V21 fixes no logic and no numbers. | Design team | Test: a pairwise UX test and the online signals before the release. |
-| 7 | When can a query run on a real intersection of two identities? | BigQuery has no mechanism today. | Design team | Fallback: the two layers of ADR 0001. |
-| 8 | Does OpsFleet accept the latency, availability and load values? | V1–V4 are assumptions. | OpsFleet | Fallback: the starting values. |
-| 9 | Does OpsFleet accept the retention periods? | V12–V15 are assumptions. | OpsFleet | Fallback: the starting values. |
-| 10 | Is `churn_90d` the default churn? | V27 is an assumption. | OpsFleet | Fallback: `churn_90d`. |
-| 11 | Do the Executives have Google identities for IAP? | A6 is an assumption. | OpsFleet | Test: sign in one Executive through IAP. |
-| 12 | Which company e-mail domain can receive Saved Reports? | A7 is an assumption. | OpsFleet | Fallback: the email tool stays design only. |
-| 13 | Is the CLI also the production channel? | A5 is an assumption. | OpsFleet | Fallback: a web chat on the same Turn API (P20). |
+| 3 | Does VPC Service Controls block the read of the public dataset for the scheduled copy? | The perimeter can block a read of a dataset outside it. | Design team | Test: run the copy from a project inside a test perimeter. |
+| 4 | Which Cloud Run CPU allocation do we need? | The server-sent events and the work after each Turn can need CPU outside a request. | Design team | Test: measure the latency and the cost at the peak of V5. |
+| 5 | How does the Executive profile learn in production? | V21 fixes no logic and no numbers. | Design team | Test: a pairwise UX test and the online signals before the release. |
+| 6 | When can a query run on a real intersection of two identities? | BigQuery has no mechanism today. | Design team | Fallback: the two layers of ADR 0001. |
+| 7 | Does OpsFleet accept the latency, availability and load values? | V1–V4 are assumptions. | OpsFleet | Fallback: the starting values. |
+| 8 | Does OpsFleet accept the retention periods? | V12–V15 are assumptions. | OpsFleet | Fallback: the starting values. |
+| 9 | Is `churn_90d` the default churn? | V27 is an assumption. | OpsFleet | Fallback: `churn_90d`. |
+| 10 | Do the Executives have Google identities for IAP? | A6 is an assumption. | OpsFleet | Test: sign in one Executive through IAP. |
+| 11 | Which company e-mail domain can receive Saved Reports? | A7 is an assumption. | OpsFleet | Fallback: the email tool stays design only. |
+| 12 | Is the CLI also the production channel? | A5 is an assumption. | OpsFleet | Fallback: a web chat on the same Turn API (P20). |
 
 ## 28. Requirement map
 

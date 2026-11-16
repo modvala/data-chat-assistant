@@ -19,7 +19,7 @@ Related principles and decisions: P9 (no raw PII), P11 and [ADR 0002](../adr/000
 6. [Accessibility](#accessibility)
 7. [Naming](#naming)
 8. [Traceability](#traceability)
-9. [Open questions](#open-questions)
+9. [Decisions and open questions](#decisions-and-open-questions)
 
 ## Rules
 
@@ -88,8 +88,8 @@ classDiagram
 | `bullets` | LLM | `items[]` | [C9 List](#c9-list) |
 | `kpi` | LLM, from query results | `label`, `value`, `unit`, `delta?`, `period` | [C7 KPI row](#c7-kpi-row) |
 | `table` | Code, from query results | `columns[]` (name, type, unit), `rows[]`, `total_rows`, `truncated` | [C6 Data table](#c6-data-table) |
-| `chart` | Code, from a `table` | `kind` (bar, sparkline), `x`, `y`, `table_ref` | [C8 Chart](#c8-chart) |
-| `action_items` | LLM | `items[]` (action, owner?, metric to watch) | [C9 List](#c9-list), numbered variant |
+| `chart` | Code, from a `table`. Not in the prototype yet. | `kind` (bar, sparkline), `x`, `y`, `table_ref` | [C8 Chart](#c8-chart) |
+| `action_items` | LLM | `items[]` (action, owner?, metric to watch). The CLI does not draw `owner`. | [C9 List](#c9-list), numbered variant |
 | `notice` | Code | `level` (info, warning, error), `title`, `body`, `trace_id` | [C11 Notice](#c11-notice) |
 | `refusal` | Code (guardrails) | `reason` (pii, scope, not_analysis, threshold, budget), `body`, `suggestion?` | [C11 Notice](#c11-notice), refusal variant |
 | `confirmation` | Code (confirmation module) | `action`, `items[]` (id, title, date), `count`, `reply_text`, `expires_at` | [C12 Confirmation panel](#c12-confirmation-panel) |
@@ -114,7 +114,7 @@ The tokens are Rich theme style names. The values use the 16 standard ANSI color
 | `dca.danger` | `bold red` | Destructive confirmation, errors. |
 | `dca.refusal` | `magenta` | Guardrail refusals. Different from errors: a refusal is correct behavior. |
 | `dca.scope` | `blue` | Brand scope labels. |
-| `dca.code` | `default on default` plus the Rich `Syntax` theme `ansi_dark` or `ansi_light` | SQL. |
+| `dca.code` | `default on default` plus the Rich `Syntax` theme `ansi_dark` | SQL. |
 | `dca.delta.up` | `green` | Positive change. Always with `▲` and a sign. |
 | `dca.delta.down` | `red` | Negative change. Always with `▼` and a sign. |
 
@@ -238,7 +238,7 @@ you ›
 | Busy | Hidden | Input is not accepted during a turn. `Ctrl+C` cancels the turn, not the session. |
 | Confirmation pending | `confirm ›` in `dca.danger` | The next message goes to the confirmation check first (ADR 0002). |
 
-Keyboard: `Enter` sends. `Ctrl+C` during a turn cancels the turn. `Ctrl+C` at the prompt or `Ctrl+D` ends the session. Up and Down arrows show earlier messages of this session.
+Keyboard: `Enter` sends. `Ctrl+C` during a turn cancels the turn. `Ctrl+C` at the prompt or `Ctrl+D` ends the session.
 
 ### C3. Turn status
 
@@ -251,7 +251,7 @@ Shows the step that the agent does now. It is the only animated component.
 | State | Text | Token |
 | --- | --- | --- |
 | Thinking | `Reading the question` | `dca.muted` |
-| Retrieval | `Finding similar analyses` | `dca.muted` |
+| Retrieval (not in the prototype yet) | `Finding similar analyses` | `dca.muted` |
 | SQL | `Writing SQL` | `dca.muted` |
 | Dry run | `Checking the query` | `dca.muted` |
 | Query | `Running the query` | `dca.muted` |
@@ -281,7 +281,7 @@ The container of one Answer.
 │  2026-10   $84,120    2,231   ▲ +9.3%                           │
 │                                                                 │
 ╰─────────────────────────────────────────────────────────────────╯
-  Scope: Allegra K, Calvin Klein · Trios: T-002 · trace 7f3a9c · /sql
+  Scope: Allegra K, Calvin Klein · trace 7f3a9c2e · /sql
 ```
 
 | Part | Rule |
@@ -303,30 +303,32 @@ The container of one Answer.
 | Header | `dca.label`. |
 | Numbers | Right aligned, formatted with `fmt.*` by column type. |
 | Maximum rows shown | 20. More rows: the first 20 and a line `Showing 20 of 312 rows. Ask to filter or group them.` in `dca.warning`. |
-| Maximum columns | 6. More columns: the core makes two tables, or the renderer uses the key-value variant. |
+| Maximum columns | Not in the prototype yet. 6. More columns: the core makes two tables, or the renderer uses the key-value variant. |
 | Empty cell | `—` in `dca.muted`. |
 | Customer column | Shows `user_id` or the pseudonym (DS8). |
 
 | Variant | Use when |
 | --- | --- |
 | Grid | Default. `box.table`. |
-| Key-value | The terminal is narrower than `width.min`, or the table has one row. Each row is a group of `label: value` lines. |
-| Ranked | The question asks for a top or bottom list. Adds a `#` column. |
+| Key-value | Not in the prototype yet. The terminal is narrower than `width.min`, or the table has one row. Each row is a group of `label: value` lines. |
+| Ranked | Not in the prototype yet. The question asks for a top or bottom list. Adds a `#` column. |
 
 Screen readers and piped output: the plain variant prints tab-separated values with a header line.
 
 ### C7. KPI row
 
-One to four key figures in one line, for the start of a report.
+One key figure for each `kpi` block, with its period on the next line. A report starts with one to four KPI blocks.
 
 ```text
- Revenue $84.1K ▲ +9.3%    Orders 2,231 ▲ +9.2%    Churn 4.3% ▼ −0.4 pp
+ Revenue $84.1K ▲ +9.3%
  2026-10 vs 2026-09
 ```
 
-Label in `dca.label`, value in `dca.strong`, delta in `dca.delta.*` with `sym.up` or `sym.down`. The period line is `dca.caption`. On a narrow terminal, each KPI goes on its own line.
+Label in `dca.label`, value in `dca.strong`, delta in `dca.delta.*` with `sym.up` or `sym.down`. The period line is `dca.caption`.
 
 ### C8. Chart
+
+**Not in the prototype yet.**
 
 A terminal chart shows a shape. The exact figures are in a table (DS6).
 
@@ -356,7 +358,7 @@ A web renderer draws real charts from the same `chart` block.
 | Variant | Symbol | Use |
 | --- | --- | --- |
 | Bullets | `sym.bullet` | `bullets` blocks. |
-| Action items | `1.` `2.` `3.` | `action_items` blocks. Each item starts with a verb. An optional `Watch:` line in `dca.caption` names the metric. |
+| Action items | `1.` `2.` `3.` | `action_items` blocks. Each item starts with a verb. A `Watch:` line in `dca.caption` names the metric. |
 
 Maximum 7 items. Nested levels: 1.
 
@@ -365,15 +367,15 @@ Maximum 7 items. Nested levels: 1.
 One `dca.caption` line under each Answer (DS2, P22). It shows only the fields that have a value.
 
 ```text
-  Scope: Allegra K, Calvin Klein · Variant: churn_90d · Trios: T-002, T-005 · 2 corrections · backup model · trace 7f3a9c · /sql
+  Scope: Allegra K, Calvin Klein · 2 corrections · backup model · trace 7f3a9c · /sql
 ```
 
 | Field | Shows when |
 | --- | --- |
 | Scope | Always. |
 | Assumptions | The agent made an assumption. Printed as a second line: `Assumed: "last month" = 2026-10.` |
-| Variant | The Answer uses a Metric variant (production). |
-| Trios | The agent used Trios. |
+| Variant | The Answer uses a Metric variant. Not in the prototype yet. |
+| Trios | The agent used Trios. Not in the prototype yet. |
 | Corrections | The agent fixed the SQL one time or more (`dca.warning`). |
 | Backup model | The fallback model made the Answer (`dca.warning`). |
 | trace | Always. |
@@ -392,9 +394,9 @@ A message that is not an analysis. It has a left bar `▌` in the level color, a
 
 ```text
 ▌ ⊘ I can't show personal data
-▌ Customer names and email addresses are protected. I can show
-▌ Customers by ID, or give totals by state.
-▌ trace 9b21e0
+▌ Customer names, email addresses and addresses are protected.
+▌ I can show Customers by ID, or give totals for a group.
+▌ trace <id>
 ```
 
 Refusal reasons and their text:
@@ -439,8 +441,7 @@ The only component for a destructive action (P11, ADR 0002, AC-R3.1). Only the c
 | --- | --- | --- |
 | 0 | No panel. An info notice: `No Saved Reports of yours mention Customer 48213.` | |
 | 1 | `yes` | AC-R3.1. |
-| 2–3 | `delete n` | AC-R3.1. The rules are in [HLD 10.3](hld.md#103-rules). |
-| More than 3 | `delete n` | AC-R3.1. |
+| 2 or more | `delete n` | AC-R3.1. The rules are in [HLD 10.3](hld.md#103-rules). |
 
 | State | Look | Behavior |
 | --- | --- | --- |
@@ -466,12 +467,11 @@ Printed by `/sql`. It shows the final SQL of the last Answer after the scope rew
 
 ### C15. Trace view
 
-Printed by `/trace <id>` (AC-R7.3). It is a tree of the spans of one turn.
+Printed by `/trace [id]` (AC-R7.3). With no ID, it shows the last Turn. It is a tree of the spans of one turn.
 
 ```text
 trace 7f3a9c · 2026-11-16 14:02:11 · 4.2 s · ✓ answered
 ├─ input classifier       ✓ analysis                     12 ms
-├─ trio retrieval         T-002 (0.81), T-005 (0.74)     88 ms
 ├─ llm gemini-3.8-flash   1,204 → 311 tokens            1.1 s
 ├─ sql validation         ✗ unknown column "revenu"      3 ms
 ├─ llm gemini-3.8-flash   correction 1                   0.9 s
@@ -483,6 +483,8 @@ trace 7f3a9c · 2026-11-16 14:02:11 · 4.2 s · ✓ answered
 The status column uses `sym.ok`, `sym.error` and `sym.refusal` with their colors. The trace view never shows PII, because the trace has none (AC-R7.1).
 
 ### C16. Profile view
+
+**Not in the prototype yet.**
 
 Printed by `/profile` (AC-R4.3, bonus). A key-value table of the Executive profile.
 
@@ -502,13 +504,14 @@ Printed by `/help`. A two-column table: the command in `dca.accent` and `dca.mon
 | --- | --- |
 | `/help` | Show the commands. |
 | `/scope` | Show your Brand scope. |
-| `/sql [all]` | Show the SQL of the last Answer. |
-| `/trace <id>` | Show the steps of a turn. |
+| `/sql [all]` | Show the SQL of the last Answer. With all: each attempt and its error. |
 | `/save [title]` | Save the last Answer as a Saved Report. |
 | `/list` | List your Saved Reports. |
 | `/undo` | Restore the reports of the last delete. |
-| `/profile` | Show or edit your profile. |
+| `/trace [id]` | Show the steps of a Turn. With no ID: the last Turn. |
 | `/exit` | End the session. |
+
+`/profile` ([C16](#c16-profile-view)) is not in the prototype yet.
 
 ## Patterns
 
@@ -534,7 +537,7 @@ stateDiagram-v2
     Done --> Ready
 ```
 
-All end states go back to Ready. No state ends the session, except `/exit`, `Ctrl+D` and an unknown Executive at the start (DS7).
+All end states go back to Ready. No state ends the session, except `/exit`, `Ctrl+D`, `Ctrl+C` at the prompt and an unknown Executive at the start (DS7).
 
 ### P-FORMAT. Format from the Executive profile
 
@@ -599,7 +602,7 @@ When a turn goes over its budget (AC-R5.3), a refusal with `reason: budget` tell
 | Screen reader | Respect `--plain` and non-TTY output: no spinner, no box lines, tables as tab-separated values, one block per paragraph. |
 | No Unicode | ASCII symbols and `box.ascii` when the encoding is not UTF-8 or with `--ascii`. |
 | Light and dark terminals | Only the 16 ANSI colors, so the terminal theme adapts them. Do not use `bright_black` for text, because it is unreadable on some dark themes. Use `dim`. |
-| Narrow terminal | Below `width.min`, tables become key-value lists and KPI rows stack. |
+| Narrow terminal | Not in the prototype yet. Below `width.min`, tables become key-value lists and KPI rows stack. |
 | Motion | `--no-animation` or non-TTY makes C3 static. |
 | Keyboard | All actions are commands or typed text. No action needs a mouse. |
 | Language | All text that the code makes (notices, refusals, statuses) follows ASD-STE100 rules: short sentences, one meaning for each word. |
@@ -630,7 +633,7 @@ The terms follow [CONTEXT.md](../../CONTEXT.md): Executive (not user), Answer (n
 | AC-R7.1, AC-R7.3 | C10 (`trace_id`), C15 |
 | P22 | DS2, C10, C14 |
 
-## Open questions
+## Decisions and open questions
 
 These questions are decided:
 

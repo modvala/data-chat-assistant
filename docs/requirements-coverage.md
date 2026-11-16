@@ -22,7 +22,7 @@ A Code, Test or Demo column stays empty ("—") when the work does not exist. Th
 
 | ID | Acceptance criterion | Mark | Design | Code | Test | Demo |
 | --- | --- | --- | --- | --- | --- | --- |
-| AC-R1.1 | At query time, Trio retrieval finds the top-k Trios that are close to the question, and the agent puts them into the context. The Answer shows the IDs of the Trios that it used (P22). In the prototype, Trio retrieval uses embeddings only (ADR 0007). Production also filters by metric tags. | Bonus | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
+| AC-R1.1 | At query time, Trio retrieval finds the top-k Trios that are close to the question, and the agent puts them into the context. The Answer shows the IDs of the Trios that it used (P22). If the prototype gets Trio retrieval, it uses embeddings only (ADR 0007). Production also filters by metric tags. | Bonus | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
 | AC-R1.2 | The design shows the update loop: candidate → analyst review → tag → index (P13), with versions for Trios and a retirement of old Trios. | Design | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
 | AC-R1.3 | The prototype has 2–3 Trios, made from the example questions of the assignment, and cites them in Answers. | Bonus | [HLD 12](design/hld.md#12-knowledge-golden-bucket-and-metric-catalog) | — | — | — |
 
@@ -72,7 +72,7 @@ A Code, Test or Demo column stays empty ("—") when the work does not exist. Th
 | --- | --- | --- | --- | --- | --- | --- |
 | AC-R7.1 | The CLI shows the `trace_id` of each turn. The trace has spans for LLM calls (model, tokens, latency), tools (SQL, bytes, rows) and guardrail decisions (block reason). No PII goes into a trace. | **Must** | [HLD 16](design/hld.md#16-observability) | [`otel_tracer.py`](../src/dca/adapters/otel_tracer.py), [`turn_api.py`](../src/dca/app/turn_api.py) | [`test_trace.py`](../tests/test_trace.py), [`test_output_guard.py`](../tests/test_output_guard.py) | [D11](site/demo-tour.md#d11-trace-of-each-turn) |
 | AC-R7.2 | The docs define the metrics before the code: turn success rate, block rate for each reason, self-correction rate, empty-result rate, LLM error and fallback rate, p50/p95 latency, cost for each turn, and the completion and abort rate of confirmations. Each metric comes out as a span attribute or a log field. | **Must** | [HLD 16](design/hld.md#16-observability) | [`metrics.py`](../src/dca/metrics.py), [`otel_tracer.py`](../src/dca/adapters/otel_tracer.py) | [`test_metrics.py`](../tests/test_metrics.py) | [D12](site/demo-tour.md#d12-metrics) |
-| AC-R7.3 | The `/trace <id>` command shows the full dialog again, step by step, from the JSONL trace file. | **Must** | [HLD 16](design/hld.md#16-observability) | [`trace_view.py`](../src/dca/core/trace_view.py), [`render.py`](../src/dca/cli/render.py) | [`test_trace.py`](../tests/test_trace.py) | [D13](site/demo-tour.md#d13-the-steps-of-a-turn) |
+| AC-R7.3 | The `/trace [id]` command shows the full dialog again, step by step, from the JSONL trace file. | **Must** | [HLD 16](design/hld.md#16-observability) | [`trace_view.py`](../src/dca/core/trace_view.py), [`render.py`](../src/dca/cli/render.py) | [`test_trace.py`](../tests/test_trace.py) | [D13](site/demo-tour.md#d13-the-steps-of-a-turn) |
 
 ## R8. Agility (Persona Management)
 
@@ -95,7 +95,7 @@ flowchart TB
 
 | ID | Item | Mark |
 | --- | --- | --- |
-| EX.1 | A result cache keyed by a hash of the normalized SQL | Bonus |
+| EX.1 | A result cache keyed by a hash of the normalized SQL. Not done: there is no code. | Bonus |
 | EX.3 | A circuit breaker for each external service | Design |
 | EX.4 | Production observability: Cloud Trace, Logging and Monitoring, and a log sink to BigQuery | Design |
 | EX.5 | A Docker setup, so that a host with only Docker can run the prototype (deliverable 5: "runnable on another machine"). [`docker/Dockerfile`](../docker/Dockerfile), [`compose.yaml`](../compose.yaml), [`test_docker_setup.py`](../tests/test_docker_setup.py), [Get started](site/get-started.md#run-with-docker) | Bonus |
