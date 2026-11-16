@@ -27,6 +27,8 @@ Use this map in step 1 to find the pages that a changed file affects.
 | `src/dca/cli/*` | Executive guide, Demo tour, Get started |
 | `src/dca/setup_bq.py`, `compose.yaml`, `docker/*`, `config/defaults.toml`, `tests/test_live.py` | Get started |
 | `src/dca/core/messages.py`, `src/dca/app/turn_api.py` | Executive guide, Demo tour |
+| Any other file in `src/` | Home (the badges) |
+| `docs/site/demo-tour.md` | Home (the demo links) |
 
 ## Home (`index.md`)
 

@@ -31,7 +31,7 @@ There are two kinds of page:
 - Use the words of the reader, not of the code. Product, service and file names are permitted (BigQuery, Cloud Run, Gemini, SQLite, `executives.json`). Internal names are not: ports, classes, modules, functions and the names of HLD building blocks (write "Input check" or "a check before the language model", not "Input guard"). General words such as "the agent" and "the sales warehouse" are permitted.
 - When the text of a page uses a glossary term (`CONTEXT.md`), such as Executive, Brand scope, Saved Report or Trio, explain it in plain words at its first use in the text of that page. Diagram labels and examples do not count as a first use. Do not link to `CONTEXT.md`.
 - Put the most useful information first: each page and each section starts with what the reader needs most.
-- Write about the product and what the reader gets. Home and the Under the hood pages name no requirement IDs (R1–R8, AC-…, EX.…) and do not say "you asked" or "we did". Headlines can be short and positive, such as "Your data stays safe".
+- Write about the product and what the reader gets. Home and the Under the hood pages name no requirement IDs (R1–R8, AC-…, EX.…) and present each feature as what the reader gets, not as an answer to the assignment. Headlines can be short and positive, such as "Your data stays safe".
 
 ### Facts
 
@@ -42,7 +42,7 @@ There are two kinds of page:
 - In a heading of a site page, write `and`, not `&`, and put no other punctuation mark between two spaces. Then the anchor is the same on the site and on github.com.
 - Each statement agrees with its source. When two sources do not agree, write what the HLD and the ADRs say, and report the disagreement (step 6).
 - On a source page, the code wins over `cli.md`, because the page owns the commands. Values that the CLI prints, or that a command needs, are permitted on a source page.
-- When the design shows a part that has no code on `main`, do not describe it as a part of the prototype. Give it the badge **Coming next**.
+- Describe a part that the design shows but that has no code on `main` as a future feature (see Badges).
 
 ### Badges
 
@@ -68,7 +68,6 @@ Each page must read correctly on the site and on github.com (P24). So use only t
 
 - Markdown headings, lists, tables, links and `text`, `bash` and `mermaid` code blocks.
 - In a numbered list, indent a code block with 4 spaces.
-- Cards: an HTML block `<div class="grid cards" markdown>`, a blank line, a Markdown list, a blank line, `</div>`.
 - A note: a Markdown blockquote (`>`).
 - Two variants, such as the prototype and production: two headed sections, one after the other.
 

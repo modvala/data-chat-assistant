@@ -38,7 +38,7 @@ When you have more than 3 brands, the header shows only the count, for example `
 
 ### In production
 
-**Coming next.** You sign in one time with your company Google account. Then the CLI sends each question through Identity-Aware Proxy (IAP), the Google Cloud sign-in service. Your Brand scope comes from the access table of the company, not from a file on your computer.
+In production, you sign in one time with your company Google account. Then the CLI sends each question through Identity-Aware Proxy (IAP), the Google Cloud sign-in service. Your Brand scope comes from the access table of the company, not from a file on your computer.
 
 **Details:** [HLD §5.3 Identity on each call](https://github.com/modvala/data-chat-assistant/blob/main/docs/design/hld.md#53-identity-on-each-call)
 

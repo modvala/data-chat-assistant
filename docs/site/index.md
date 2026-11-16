@@ -31,7 +31,7 @@ You get an Answer in this shape:
 
 **Available now**
 
-Ask a question, ask follow-up questions, and type `/save` to keep a report as a Saved Report (an analysis that you keep). A report starts with key figures and ends with Action items: recommended next steps, each with a metric to watch. The agent writes new SQL for each question and runs it on the live sales data.
+Ask a question, ask follow-up questions, and type `/save` to keep a report as a Saved Report (an analysis that you keep). A report starts with key figures and ends with Action items: recommended next steps, each with a metric to watch. The agent writes new SQL for each question and runs it on the sales data in BigQuery.
 
 [See it in the demo](demo-tour.md#d1-core-chat-ac-core1)
 
@@ -39,9 +39,9 @@ Ask a question, ask follow-up questions, and type `/save` to keep a report as a 
 
 **Available now**
 
-You see only the data of your Brand scope: your own brands, or all brands for the CEO. No personal data gets to the Answer, and results by age, gender or place hide small groups of buyers. Our code adds the Brand scope to each query, BigQuery checks it again in production, and red-team tests show that attacks are blocked.
+You see only the data of your Brand scope: your own brands, or all brands for the CEO. No personal data gets to the Answer, and results by age, gender or place hide small groups of buyers. Our code adds the Brand scope to each query, and red-team tests show that attacks are blocked.
 
-[See it in the demo](demo-tour.md#d2-no-pii-in-the-output-ac-r21)
+[See it in the demo](demo-tour.md#d3-brand-scope-ac-r22)
 
 ## Nothing is deleted without your yes
 
@@ -66,7 +66,7 @@ flowchart TB
 
 **Available now**
 
-A failed query gets a fix, and an empty result gets a reason, such as `Did you mean Shipped?`. When a service fails, the agent tries again or uses a backup model, and your session continues. Each question has a budget of model calls, data and time, `Ctrl+C` stops a question, and chaos mode adds failures for a test.
+A failed query gets a fix, and an empty result gets a reason, such as `Did you mean …?` for a value that has a typo. When a service fails, the agent tries again or uses a backup model, and your session continues. Each question has a budget of model calls, data and time, `Ctrl+C` stops a question, and chaos mode adds failures for a test.
 
 [See it in the demo](demo-tour.md#d9-service-failures-ac-r52)
 
@@ -136,7 +136,9 @@ flowchart TB
 
 ## Also on the roadmap
 
-**Coming next:** the design also has these features.
+**Coming next**
+
+The design also has these features:
 
 - **Metric catalog:** one reviewed definition for each business metric, such as churn.
 - **Result cache:** a repeated query costs less, with a separate cache for each Brand scope.
