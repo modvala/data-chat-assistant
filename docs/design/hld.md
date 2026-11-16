@@ -101,13 +101,17 @@ OpsFleet did not give the facts and the figures in this section. We selected the
 | A1 | The access mapping is our decision: `executives.json` in the prototype, one BigQuery access table in production. | The dataset has no mapping. OpsFleet lets us select the form. | Design team |
 | A2 | We make our own Golden Bucket: 2–3 Trios in the prototype, from the questions of the assignment. | The assignment calls the bucket "theoretical". | Design team |
 | A3 | We make our own Saved Reports library. | The assignment supplies no library. | Design team |
-| A4 | "Client X" in a delete request means a Customer. Each Saved Report records the IDs of the Customers that it mentions. | The dataset has Customers, not other parties. | Design team |
+| A4 | "Client X" in a delete request means a Customer. Each Saved Report records the IDs of the Customers that it mentions, and the delete matches on these IDs. For a name, the agent asks for the Customer ID. | The dataset has Customers, not other parties. | Design team |
 | A5 | The CLI is the channel for Executives also in production. It calls the Turn API through IAP. | The assignment asks for a CLI (P20). | OpsFleet confirms |
 | A6 | The Executives have company Google identities, so IAP can sign them in. | IAP needs Google identities. OpsFleet did not name its identity provider. | OpsFleet confirms |
 | A7 | Saved Reports by email go only to addresses in the company e-mail domain. | The assignment names email only as an extension, with no rule. | OpsFleet confirms |
 | A8 | The **Undo window** is 24 hours. | AC-R3.3 asks for an Undo window, but gives no length. | Design team |
 | A9 | The prototype has no real sign-in. `--executive <id>` selects the Executive from `executives.json`. | The prototype has no real Executives. | Design team |
-| A10 | The prototype can use the Gemini API free tier. On the free tier, Google can use the prompts and the responses to improve its products. | The dataset is public and synthetic. | Design team |
+| A10 | The prototype can use the Gemini API free tier. On the free tier, Google can use the prompts and the responses to improve its products. Reviewers use their own API key. On the free tier, `gemini-3.8-flash` often answers "high demand"; the agent then retries and uses the backup model. | The dataset is public and synthetic. | Design team |
+| A11 | A row list of Customers that shows age, gender, state or city gets a refusal `pii`, also with no filter on these columns. A demographic aggregate is permitted. | The client decisions block row lists filtered by attributes such as age. We block them also with no filter. | Design team |
+| A12 | The conversation context keeps the earlier answered Turns in full and a handle for each earlier query, within the conversation limit of V18. There is no LLM summary of older Turns. A refused Turn does not come back into the context. | No rule is given. V18 sets the size. | Design team |
+| A13 | After the second failed SQL correction, the Executive gets an error notice, not a refusal `budget`. When an earlier query of the Turn returned rows, the Executive gets an Answer from those rows. The trace records a budget stop. | No rule is given for a failed correction. | Design team |
+| A14 | When the intent classifier fails, the message goes on as an analysis question. The SQL guard and the Output guard still check each query and each Answer. | No rule is given for a classifier failure. | Design team |
 
 ### 3.2 Starting values
 
@@ -143,6 +147,7 @@ These values are configuration (P17), not requirements. Tune them with the eval 
 | V26 | Cloud Run: concurrency 20, minimum 1 instance. The CPU allocation is open. | A Turn waits on I/O most of the time. [Section 27](#27-open-questions). |
 | V27 | Default churn: 90 days with no order (`churn_90d`) | The dataset has no definition (ADR 0007). OpsFleet confirms. |
 | V28 | The dataset is smaller than 1 GB. Most queries scan less than 100 MB. The data refreshes each day. | Secondary sources (about 539 MB as CSV). Not verified: check it with dry runs. |
+| V29 | Prices for the "cost for each Turn" metric: $0.0005 for each 1 k LLM tokens, $6.25 for each TiB that BigQuery scans | Starting values, not quotes. The prototype uses the free tiers. Change them to the contract prices. |
 
 ## 4. Logical architecture
 
@@ -1563,10 +1568,10 @@ The decisions that are hard to change have an ADR (P18).
 | --- | --- | --- |
 | IAP sign-in and the BigQuery token of the Executive | `--executive <id>` from `executives.json` (A9) | No real Executives. The Brand scope logic is the same. |
 | Row access policies as the Executive on a curated copy | Brand scope rewrite only; BigQuery IAM covers the service side | We cannot put policies on a public dataset. |
-| Firestore, stateless instances | In memory and local files, behind the same ports | One CLI process. The ports keep the core the same (P21). |
+| Firestore, stateless instances | Sessions in memory; Saved Reports and the audit log in SQLite (`data/dca_reports.sqlite`), behind the same ports | One CLI process. The ports keep the core the same (P21). |
 | Gemini on Vertex AI | Gemini API free tier (A10) | The data is public and synthetic. Reviewers use their own key. |
 | Model Armor and Sensitive Data Protection | Rules in our code | Our own layers are the main protection. The managed layers are extra. |
-| Cloud Trace, Logging, Monitoring | JSONL file and `/trace` | The same spans and attributes. |
+| Cloud Trace, Logging, Monitoring | JSONL file (`data/dca_traces.jsonl`) and `/trace` | The same spans and attributes. |
 | Versioned Golden Bucket with review, `VECTOR_SEARCH` and metric tags | None | Trio retrieval is a bonus that is not built. The design shows the update loop. |
 | Metric catalog with Metric variants | None | The LLM interprets the terms, and the Answer states them as assumptions (ADR 0007). |
 | Learned Executive profile | None | R4 is Design and Bonus. |

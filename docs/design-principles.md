@@ -29,7 +29,7 @@ Do a bonus feature only when it is cheap and only after the required features ar
 
 ### P3. Mock what is missing, and say so
 
-We create our own report library and manager-to-brand mapping. The Golden Bucket is a bonus (P2), and the prototype does not have it. The customer decisions about access, PII and tools are in [client decisions](requirements/2026-11-12-client-decisions.md). Write all other assumptions in the README.
+We create our own report library and manager-to-brand mapping. The Golden Bucket is a bonus (P2), and the prototype does not have it. The customer decisions about access, PII and tools are in [client decisions](requirements/2026-11-12-client-decisions.md). Write all other assumptions in [HLD §3](design/hld.md#3-assumptions-and-starting-values).
 
 ## Architecture
 
