@@ -32,6 +32,7 @@ class TurnRecord(BaseModel):
     answer: Answer
     outcome: str
     query_ids: list[str] = Field(default_factory=list)
+    attempts: list[SqlAttempt] = Field(default_factory=list)
 
 
 class PendingConfirmation(BaseModel):
@@ -50,7 +51,6 @@ class SessionState(BaseModel):
     executive_id: str
     turns: list[TurnRecord] = Field(default_factory=list)
     handles: list[QueryHandle] = Field(default_factory=list)
-    last_attempts: list[SqlAttempt] = Field(default_factory=list)
     pending: PendingConfirmation | None = None
 
     @property

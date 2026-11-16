@@ -35,6 +35,13 @@ from dca.core.turn import DateRange, ThresholdState, TurnContext, TurnFinish, Tu
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
 
+def _pretty(sql: str) -> str:
+    try:
+        return sqlglot.transpile(sql, read="bigquery", write="bigquery", pretty=True)[0]
+    except sqlglot.errors.SqlglotError:
+        return sql
+
+
 class _GateDone(Exception):
     """The Confirmation gate handled the message. The Turn ends here."""
 
@@ -348,10 +355,14 @@ class TurnAPI:
                         customer_ids=query.customer_ids,
                     )
                 )
-            state.last_attempts = turn.attempts
         state.turns.append(
             TurnRecord(
-                trace_id=answer.provenance.trace_id, message=text, answer=answer, outcome=outcome, query_ids=query_ids
+                trace_id=answer.provenance.trace_id,
+                message=text,
+                answer=answer,
+                outcome=outcome,
+                query_ids=query_ids,
+                attempts=turn.attempts if turn is not None else [],
             )
         )
         self.sessions.save(state)
@@ -364,8 +375,19 @@ class TurnAPI:
 
     # --- Commands (no LLM)
 
-    def _cmd_sql(self, state: SessionState, _args: str) -> Answer:
-        """The final SQL of the last Answer, after the Brand scope rewrite (cli.md C14). No LLM."""
+    def _cmd_sql(self, state: SessionState, args: str) -> Answer:
+        """The final SQL of the last Answer, after the Brand scope rewrite (cli.md C14). No LLM.
+
+        `/sql all` shows each SQL attempt of the last Turn with SQL, and its error.
+        """
+        if args.strip() == "all":
+            record = next((record for record in reversed(state.turns) if record.attempts), None)
+            if record is not None:
+                views = [
+                    SqlView(sql=_pretty(attempt.final_sql or attempt.sql), error=attempt.error)
+                    for attempt in record.attempts
+                ]
+                return Answer(kind="answer", blocks=views)
         last = next((record for record in reversed(state.turns) if record.query_ids), None)
         if last is None:
             notice = Notice(level="info", title="The last Answer ran no SQL", body="Ask a question about the data first.")
@@ -374,8 +396,7 @@ class TurnAPI:
         blocks: list = []
         for query_id in last.query_ids:
             handle = handles[query_id]
-            pretty = sqlglot.transpile(handle.sql, read="bigquery", write="bigquery", pretty=True)[0]
-            blocks.append(SqlView(sql=pretty, bytes_scanned=handle.bytes_scanned, row_count=handle.row_count))
+            blocks.append(SqlView(sql=_pretty(handle.sql), bytes_scanned=handle.bytes_scanned, row_count=handle.row_count))
         return Answer(kind="answer", blocks=blocks)
 
     def _cmd_save(self, state: SessionState, args: str) -> Answer:
