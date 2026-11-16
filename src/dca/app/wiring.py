@@ -2,6 +2,7 @@
 
 from dotenv import load_dotenv
 
+from dca.adapters import chaos
 from dca.adapters.bigquery_warehouse import BigQueryWarehouse
 from dca.adapters.gemini_llm import GeminiLLMClient
 from dca.adapters.local_stores import InMemorySessionStore, JsonConfigStore, SchemaKnowledgeStore
@@ -16,14 +17,21 @@ def build_turn_api(settings: Settings | None = None) -> TurnAPI:
     load_dotenv()  # google-genai and ADK read GOOGLE_API_KEY from the environment.
     settings = settings or Settings()
     knowledge = SchemaKnowledgeStore()
+    llm, model_factory, warehouse = chaos.wrap(
+        settings.chaos,
+        settings.chaos_seed,
+        GeminiLLMClient(settings.google_api_key, settings.timeout.llm_call_s),
+        gemini_factory,
+        BigQueryWarehouse(settings.google_cloud_project),
+    )
     return TurnAPI(
         settings=settings,
         config_store=JsonConfigStore(settings.paths.executives),
         session_store=InMemorySessionStore(),
-        warehouse=BigQueryWarehouse(settings.google_cloud_project),
+        warehouse=warehouse,
         tracer=JsonlTracer(settings.paths.trace_file),
         knowledge=knowledge,
-        llm=GeminiLLMClient(settings.google_api_key, settings.timeout.llm_call_s),
-        agent_loop=AdkAgentLoop(gemini_factory, knowledge),
+        llm=llm,
+        agent_loop=AdkAgentLoop(model_factory, knowledge),
         report_store=SQLiteReportStore(settings.paths.reports_db),
     )

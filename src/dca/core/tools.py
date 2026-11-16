@@ -9,15 +9,20 @@
 | plan_delete | plan: changes nothing, the Confirmation gate deletes |
 """
 
+import time
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypeVar
 
-from dca.core import confirmation, demographic, diagnostic, reports, sql_guard
+from dca.core import backoff, confirmation, demographic, diagnostic, reports, sql_guard
 from dca.core.answer import Answer, Notice
 from dca.core.ports import Grant, KnowledgeStore, WarehouseError, WarehouseTransientError
 from dca.core.state import SqlAttempt
 from dca.core.turn import QueryRun, TurnContext, TurnFinish, TurnStop
+
+
+T = TypeVar("T")
 
 
 def describe_schema(knowledge: KnowledgeStore) -> dict[str, Any]:
@@ -136,7 +141,7 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
 
             with turn.tracer.span("bq.dry_run") as span:
                 try:
-                    estimate = turn.warehouse.dry_run(verdict.sql, verdict.params)
+                    estimate = _with_retry(turn, lambda _job: turn.warehouse.dry_run(verdict.sql, verdict.params), "")
                 except WarehouseError as error:
                     span.set("error", str(error))
                     if verdict.route == "threshold_view" and _view_missing(error):
@@ -155,12 +160,16 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
         query_id = turn.next_query_id()
         with turn.tracer.span("bq.query", sql=verdict.sql) as span:
             try:
-                result = turn.warehouse.run(
-                    verdict.sql,
-                    verdict.params,
-                    max_bytes=settings.budget.query_bytes,
-                    timeout_s=settings.timeout.bq_job_s,
-                    job_id=f"dca-{turn.trace_id}-{query_id}-{len(turn.attempts)}",
+                result = _with_retry(
+                    turn,
+                    lambda job_id: turn.warehouse.run(
+                        verdict.sql,
+                        verdict.params,
+                        max_bytes=settings.budget.query_bytes,
+                        timeout_s=settings.timeout.bq_job_s,
+                        job_id=job_id,
+                    ),
+                    f"dca-{turn.trace_id}-{query_id}-{len(turn.attempts)}",
                 )
             except WarehouseError as error:
                 span.set("error", str(error))
@@ -187,6 +196,25 @@ def run_query(turn: TurnContext, sql: str, grant: Grant) -> dict[str, Any]:
         "rows": rows[: settings.limits.rows_to_llm],
         "row_count": len(rows),
     }
+
+
+def _with_retry(turn: TurnContext, call: Callable[[str], T], job_id: str) -> T:
+    """A BigQuery 5xx or timeout gets `bq_retries` retries with backoff (V8). Our code cancels the
+    timed-out job first, so that it does not run on (V9). Each retry has a new job ID."""
+    retry = turn.settings.retry
+    for attempt in range(retry.bq_retries + 1):
+        try:
+            return call(f"{job_id}-r{attempt}" if job_id and attempt else job_id)
+        except WarehouseTransientError as error:
+            if error.job_id:
+                turn.warehouse.cancel(error.job_id)
+            turn.tracer.log("bq.transient_error", attempt=attempt + 1, error=str(error)[:100])
+            if attempt == retry.bq_retries:
+                raise
+            wait = backoff.delay(attempt + 1, None, retry)
+            turn.progress("retry", {"seconds": max(1, round(wait))})
+            time.sleep(wait)
+    raise AssertionError("unreachable")
 
 
 def _empty_result(turn: TurnContext, llm_sql: str, grant: Grant, *, demographic_route: bool) -> None:

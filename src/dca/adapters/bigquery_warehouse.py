@@ -67,7 +67,7 @@ class BigQueryWarehouse:
                 raise WarehouseCancelled() from None
             raise WarehouseError(_message(error)) from None
         except _TRANSIENT as error:
-            self.cancel(job_id)
+            # The core cancels the job and decides on a retry (V8, V9).
             raise WarehouseTransientError(type(error).__name__, job_id=job_id) from None
         columns = [field.name for field in rows.schema]
         data = [list(row.values()) for row in rows]

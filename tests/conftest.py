@@ -57,6 +57,7 @@ def make_settings(tmp_path: Path) -> Callable[..., Settings]:
             "trace_file": str(tmp_path / "traces.jsonl"),
         }
         paths.update(overrides.pop("paths", {}))  # type: ignore[arg-type]
+        overrides.setdefault("retry", {"backoff_min_s": 0.001, "backoff_max_s": 0.002})  # no real waits in tests
         return Settings(_env_file=None, paths=paths, **overrides)
 
     return build

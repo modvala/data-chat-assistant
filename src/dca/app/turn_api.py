@@ -5,6 +5,7 @@ Each Turn loads the session state at the start and saves it at the end (P21).
 
 import asyncio
 import contextvars
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,7 +15,7 @@ from typing import Any
 import sqlglot
 
 from dca.config import Settings
-from dca.core import confirmation, context, drafting, input_guard, messages, reports
+from dca.core import backoff, confirmation, context, drafting, input_guard, messages, reports
 from dca.core.answer import Answer, Bullets, Heading, Notice, Provenance, Refusal, Result, SqlView, Text
 from dca.core.ports import (
     AuditEntry,
@@ -22,6 +23,8 @@ from dca.core.ports import (
     Grant,
     KnowledgeStore,
     LLMClient,
+    LLMTransientError,
+    LLMUnavailable,
     ReportStore,
     Role,
     SessionStore,
@@ -165,7 +168,7 @@ class TurnAPI:
                     reports=self.reports,
                     now=self.clock(),
                 )
-                decision = self._input_guard(text)
+                decision = self._input_guard(text, progress)
                 if decision.blocked:
                     answer = self._refusal(turn, TurnStop("not_analysis", decision.reason))
                     outcome = "refused"
@@ -251,14 +254,14 @@ class TurnAPI:
         result = Result(action="deleted", count=len(ids), undo_until=undo_until)
         return Answer(kind="answer", blocks=[result]), "done", []
 
-    def _input_guard(self, text: str) -> input_guard.InputDecision:
+    def _input_guard(self, text: str, progress: ProgressCallback) -> input_guard.InputDecision:
         with self.tracer.span("guard.input") as span:
             reason = input_guard.check_rules(text, self.settings.limits.input_max_chars)
             if reason is not None:
                 decision = input_guard.InputDecision("other", reason)
             else:
                 try:
-                    intent, tokens = input_guard.classify(self.llm, text, model=self.settings.fallback_model)
+                    intent, tokens = self._classify(text, progress)
                     span.set("tokens", tokens)
                     decision = input_guard.InputDecision(intent, "intent" if intent == "other" else "")
                 except Exception as error:  # noqa: BLE001 - the classifier is only the first filter
@@ -268,6 +271,20 @@ class TurnAPI:
             span.set("decision", "blocked" if decision.blocked else "allowed")
             span.set("reason", decision.reason)
         return decision
+
+    def _classify(self, text: str, progress: ProgressCallback) -> tuple[str, int]:
+        """The classifier call with backoff for a 429, a 5xx or a timeout (V8)."""
+        retry = self.settings.retry
+        for attempt in range(retry.llm_retries + 1):
+            try:
+                return input_guard.classify(self.llm, text, model=self.settings.fallback_model)
+            except LLMTransientError as error:
+                if attempt == retry.llm_retries:
+                    raise
+                wait = backoff.delay(attempt + 1, error.retry_after, retry)
+                progress("retry", {"seconds": max(1, round(wait))})
+                time.sleep(wait)
+        raise AssertionError("unreachable")
 
     def _schema_answer(self, turn: TurnContext) -> Answer:
         """A schema question gets an Answer from the schema description, with no query."""
@@ -316,17 +333,31 @@ class TurnAPI:
             instruction, tokens = context.instruction(turn, self.knowledge.schema())
             for part, count in tokens.items():
                 span.set(f"tokens.{part}", count)
-        model = self.settings.model
-        try:
-            # A copied context: the ADK run must not leave its span as the current span.
-            final = contextvars.copy_context().run(
-                asyncio.run, self.agent_loop.run(turn, instruction=instruction, message=text, model=model)
-            )
-        except TurnStop as stop:
-            return self._refusal(turn, stop), "refused"
-        except TurnFinish as finish:
-            return finish.answer, finish.outcome
-        answer = drafting.answer_from_draft(final, turn, model=model)
+        # After the main model fails its retries, the Turn runs again with the fallback model.
+        # ADK does not change models (ADR 0003).
+        for model, fallback_used in ((self.settings.model, False), (self.settings.fallback_model, True)):
+            if fallback_used:
+                turn.progress("fallback", {})
+                self.tracer.log("llm.fallback", model=model)
+                turn.queries.clear()
+                turn.attempts.clear()
+            try:
+                # A copied context: the ADK run must not leave its span as the current span.
+                final = contextvars.copy_context().run(
+                    asyncio.run,
+                    self.agent_loop.run(
+                        turn, instruction=instruction, message=text, model=model, fallback_used=fallback_used
+                    ),
+                )
+                break
+            except LLMUnavailable:
+                if fallback_used:
+                    raise
+            except TurnStop as stop:
+                return self._refusal(turn, stop), "refused"
+            except TurnFinish as finish:
+                return finish.answer, finish.outcome
+        answer = drafting.answer_from_draft(final, turn, model=model, fallback_used=fallback_used)
         return answer, "refused" if any(isinstance(block, Refusal) for block in answer.blocks) else "answered"
 
     def _refusal(self, turn: TurnContext, stop: TurnStop) -> Answer:
