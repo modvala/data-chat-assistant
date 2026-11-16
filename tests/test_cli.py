@@ -9,7 +9,7 @@ from dca.app.turn_api import SessionInfo, TurnAPI
 from dca.cli.main import make_app
 from dca.cli.render import THEME, Mode, Renderer
 from dca.config import Settings
-from dca.core.answer import Answer, Heading, Provenance, Text
+from dca.core.answer import Answer, Column, Heading, Provenance, Table, Text
 from tests.fakes import FakeWarehouse, ScriptedLLM, answer, call
 
 runner = CliRunner()
@@ -90,3 +90,40 @@ def test_ac_core_1_answer_panel_on_a_terminal() -> None:
     assert "◆ Data Chat Assistant" in output
     assert "╭─ ◆ Revenue" in output
     assert "Scope: Allegra K, Calvin Klein · trace 7f3a9c00" in output
+
+
+def _wide_answer() -> Answer:
+    years = [f"y{year}" for year in range(2019, 2027)]
+    columns = [Column(name="brand"), *(Column(name=name, type="number") for name in [*years, "total"])]
+    rows = [
+        ["Calvin Klein", 1121.5, 3641.2, 8389.7, 11226.4, 15620.9, 22481.3, 32652.8, 55861.1, 150996.12],
+        ["Allegra K", 579.96, 1677.3, 3254.8, 4654.1, 7124.5, 9844.2, 14388.6, 25033.4, 66556.21],
+    ]
+    table = Table(query_id="q1", columns=columns, rows=rows, total_rows=2)
+    return Answer(kind="answer", blocks=[Heading(text="Revenue by Brand and Year"), table])
+
+
+def _render(answer: Answer, width: int) -> str:
+    console = Console(theme=THEME, force_terminal=True, record=True, width=width)
+    Renderer(console, Mode(), header_max_brands=3).answer(answer)
+    return console.export_text()
+
+
+def test_ac_core_1_wide_table_uses_the_terminal_width_and_shows_full_values() -> None:
+    output = _render(_wide_answer(), width=160)
+    assert "…" not in output
+    assert "Calvin Klein" in output
+    assert "150,996.12" in output
+    assert 100 < max(len(line) for line in output.splitlines()) < 160
+
+
+def test_ac_core_1_table_on_a_narrow_terminal_wraps_values_and_does_not_cut_them() -> None:
+    output = _render(_wide_answer(), width=100)
+    assert "…" not in output
+    assert max(len(line) for line in output.splitlines()) <= 100
+
+
+def test_ac_core_1_text_panel_stays_at_width_max_on_a_wide_terminal() -> None:
+    answer = Answer(kind="answer", blocks=[Heading(text="Revenue"), Text(markdown="Revenue grew. " * 20)])
+    output = _render(answer, width=160)
+    assert max(len(line) for line in output.splitlines()) == 100

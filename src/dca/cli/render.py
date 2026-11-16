@@ -10,6 +10,7 @@ from typing import Any
 from rich import box
 from rich.console import Console, Group, RenderableType
 from rich.markdown import Markdown
+from rich.measure import Measurement
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.syntax import Syntax
@@ -268,6 +269,9 @@ class Renderer:
                 spaced.append(RichText(""))
             spaced.append(renderable)
         title = f"{self.sym('agent')} {heading}" if heading else self.sym("agent")
+        # width.max is for text. A wider table makes the panel wider, up to the terminal width (C6).
+        tables = [r for block, r in zip(body, renderables, strict=True) if isinstance(block, Table)]
+        needed = max((Measurement.get(self.console, self.console.options, t).maximum + 4 for t in tables), default=0)
         self.out(
             Panel(
                 Group(*spaced),
@@ -275,7 +279,7 @@ class Renderer:
                 title_align="left",
                 box=self._box,
                 padding=(0, 1),
-                width=min(self.console.width, WIDTH_MAX),
+                width=min(self.console.width, max(WIDTH_MAX, needed)),
             )
         )
 
@@ -334,7 +338,8 @@ class Renderer:
         table = RichTable(box=box.ASCII if self.mode.ascii else box.SIMPLE_HEAD, header_style="dca.label")
         for column in block.columns:
             numeric = column.type in ("money", "int", "number")
-            table.add_column(column.name, justify="right" if numeric else "left")
+            # "fold" wraps a long value onto the next line. It never cuts a value with "…".
+            table.add_column(column.name, justify="right" if numeric else "left", overflow="fold")
         for row in rows:
             table.add_row(*row)
         if hint:
