@@ -36,16 +36,18 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 _MONEY_WORDS = ("revenue", "sale_price", "spend", "price", "cost", "sales", "amount", "aov", "value")
 
 
-def parse_draft(text: str) -> list[dict[str, Any]]:
-    """The LLM answers with `{"blocks": [...]}`. Other text becomes one `text` block."""
+def parse_draft(text: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """The LLM answers with `{"blocks": [...], "assumptions": [...]}`. Other text becomes one `text` block."""
     stripped = _FENCE.sub("", text.strip())
     try:
         data = json.loads(stripped)
     except json.JSONDecodeError:
-        return [{"type": "text", "markdown": text.strip()}] if text.strip() else []
+        return ([{"type": "text", "markdown": text.strip()}] if text.strip() else []), []
     if isinstance(data, dict) and isinstance(data.get("blocks"), list):
-        return [block for block in data["blocks"] if isinstance(block, dict)]
-    return [{"type": "text", "markdown": text.strip()}]
+        blocks = [block for block in data["blocks"] if isinstance(block, dict)]
+        assumptions = [str(item) for item in data.get("assumptions") or [] if isinstance(item, str | int | float)]
+        return blocks, assumptions
+    return [{"type": "text", "markdown": text.strip()}], []
 
 
 def build_blocks(draft: list[dict[str, Any]], turn: TurnContext) -> tuple[list, list[str]]:
@@ -107,10 +109,11 @@ def provenance(turn: TurnContext, *, model: str, fallback_used: bool = False) ->
 
 
 def answer_from_draft(text: str, turn: TurnContext, *, model: str, fallback_used: bool = False) -> Answer:
-    blocks, dropped = build_blocks(parse_draft(text), turn)
+    draft, assumptions = parse_draft(text)
+    blocks, dropped = build_blocks(draft, turn)
     with turn.tracer.span("guard.output") as span:
         span.set("dropped_blocks", dropped)
-        reason = output_guard.check(blocks)
+        reason = output_guard.check(blocks + [Text(markdown=item) for item in assumptions])
         span.set("decision", "blocked" if reason else "allowed")
         span.set("reason", reason)
     if reason:
@@ -121,4 +124,6 @@ def answer_from_draft(text: str, turn: TurnContext, *, model: str, fallback_used
         )
     if not blocks:
         blocks = [Text(source="code", markdown="I have no answer for this question. Please ask it in a different way.")]
-    return Answer(kind="answer", blocks=blocks, provenance=provenance(turn, model=model, fallback_used=fallback_used))
+    checked = provenance(turn, model=model, fallback_used=fallback_used)
+    checked.assumptions = assumptions
+    return Answer(kind="answer", blocks=blocks, provenance=checked, report=turn.intent == "report")

@@ -116,6 +116,17 @@ class Result(BaseModel):
     undo_until: datetime | None = None
 
 
+class SqlView(BaseModel):
+    """The SQL of the last Answer, for /sql (cli.md C14). Only our code makes it."""
+
+    type: Literal["sql"] = "sql"
+    source: Source = "code"
+    sql: str
+    bytes_scanned: int = 0
+    row_count: int | None = None
+    error: str = ""
+
+
 class TableRef(BaseModel):
     """A place for a table in an LLM draft. Our code fills it from the query rows."""
 
@@ -124,7 +135,7 @@ class TableRef(BaseModel):
 
 
 Block = Annotated[
-    Heading | Text | Bullets | Kpi | ActionItems | Table | Notice | Refusal | Confirmation | Result,
+    Heading | Text | Bullets | Kpi | ActionItems | Table | Notice | Refusal | Confirmation | Result | SqlView,
     Field(discriminator="type"),
 ]
 

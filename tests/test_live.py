@@ -24,7 +24,7 @@ class RecordingWarehouse(BigQueryWarehouse):
 
     def run(self, sql, params, *, max_bytes, timeout_s, job_id):  # type: ignore[no-untyped-def]
         result = super().run(sql, params, max_bytes=max_bytes, timeout_s=timeout_s, job_id=job_id)
-        if not job_id.startswith("dca-brands-"):
+        if not job_id.startswith(("dca-brands-", "dca-dates-")):
             self.results.append(result)
         return result
 
